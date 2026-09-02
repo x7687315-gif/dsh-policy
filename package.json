@@ -1,0 +1,29 @@
+{
+  "name": "dsh-policy",
+  "version": "0.1.0",
+  "description": "User-controlled policy & personalization runtime for DeepSeek Harness — enforce hard project constraints at the agent lifecycle boundary.",
+  "type": "module",
+  "license": "MIT",
+  "author": "x7687315-gif",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/x7687315-gif/dsh-policy.git"
+  },
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/plugin/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "demo": "tsx examples/demo.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
