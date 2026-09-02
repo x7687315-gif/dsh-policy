@@ -1,0 +1,13 @@
+{
+  "project": "my-api",
+  "policy": {
+    "hard": [
+      {
+        "id": "test-after-code-change",
+        "trigger": "code_change",
+        "require": "tests_pass",
+        "enforcement": "hard"
+      }
+    ]
+  }
+}
