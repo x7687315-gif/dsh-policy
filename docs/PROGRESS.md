@@ -53,6 +53,10 @@
 | 2026-09-03 | （本次） | feat: MUST NOT gate + rule-aware prompting (v1) — Stage 6 |
 | 2026-09-03 | （本次） | ci + docs sync — Stage 7 |
 
+## 里程碑状态（续）
+
+> ✅ **Phase 4 收尾达成（2026-09-03）**：证据可按会话持久化并在进程重启后继续拦截（JSONL、追加写、崩溃容忍）；HMR 安全测试通过（官方 registry 硬性要求）；npm 发布形态就绪（tsdown 产物 dist/index.mjs）。
+
 ## 剩余工作（下一轮）
 
 - 证据层完整形态：跨 session 关联、JSONL 持久化、事件/会话相关性（Phase 4 收尾）；
