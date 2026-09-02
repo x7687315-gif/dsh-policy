@@ -32,8 +32,11 @@
 > ✅ **Phase 3 exit criterion（2026-09-03）**：硬规则作为数据表示并被引擎泛化评估（多规则独立、作用域单调、停用不强制）。
 > ✅ **Phase 4 收尾（2026-09-03）**：证据按会话持久化、进程重启后继续拦截（JSONL 追加写、崩溃容忍）；HMR 安全测试通过；npm 发布形态就绪。
 > ✅ **缺陷审查轮（2026-09-03，Stage 9）**：修复三个缺陷（补救预算跨回合不重置、root 注册卸载不清理导致解释/强制分叉、deny 规则省略 trigger 静默失效），各配回归测试钉死。
+> ✅ **Roadmap 规划完成（2026-09-03）**：Stage 10-16 详细技术实施方案定稿 → [roadmap.md](./roadmap.md)（数据结构、算法、Harness 集成点、测试策略、风险登记册、计划书条文映射）。各阶段开工前以该文档为技术基线。
 
 ## 后续阶段（按计划书继续）
+
+> **详细技术方案（数据结构 / 算法 / 集成点 / 测试策略 / 风险）见 [roadmap.md](./roadmap.md)。**
 
 | 阶段 | 目标 | 对应计划书 |
 |---|---|---|
@@ -59,8 +62,9 @@
 | 2026-09-03 | 1a478ab | feat: durable evidence, HMR safety, policy guide — Stage 8 |
 | 2026-09-03 | 0ba14eb | build: tsdown bundle — Stage 8 |
 | 2026-09-03 | 4f9c279 | docs: stage 8 sync — Stage 8 |
-| 2026-09-03 | （本次） | fix: per-turn budget, root cleanup, strict deny trigger — Stage 9 |
-| 2026-09-03 | （本次） | docs: stage 9 review report + architecture §9 — Stage 9 |
+| 2026-09-03 | d9584bf | fix: per-turn budget, root cleanup, strict deny trigger — Stage 9 |
+| 2026-09-03 | 7a6a464 | docs: stage-9 review report + architecture §9 — Stage 9 |
+| 2026-09-03 | （本次） | docs: roadmap for stages 10-16 — 技术规划 |
 
 ## 剩余工作（下一轮入口）
 
