@@ -61,3 +61,14 @@ turn/start → [preStep: agent/pre-step waterfall (reject|enter)] → step … s
 - **PromptContext 不是 system 槽文本**：`context()` 的产物是 durable user-role 快照，追加进每步请求的 `messages`（preStep 中 `[...claimed, context]`）；`system` 字段仍由 section/persona 组成。
 - 取舍记录：root 注册的 effect 归 root 所有，插件 dispose 不会自动摘除（HMR 场景需自行管理 disposer）。MVP 接受此取舍，Stage 8+ 可改为 `ctx.effect` 包装。
 - 工具级门禁实测：`tools/pre-execute` 返回 `{ kind:'deny', reason }`（不调 `next()`）→ 错误结果回给模型，工具体从未执行——MUST NOT 规则的正确挂点。
+
+## 9. Stage 9 补充核实：root 注册的正确清理模式
+
+- `systemPrompt.context()` 返回 disposer（官方 loop.spec 的用法：`const dispose = ctx.systemPrompt.context({...})`）。注册到 `ctx.root` 时，清理必须显式挂回插件自己的 fiber：
+  ```ts
+  const dispose = root.systemPrompt.context({ name, order, text })
+  ctx.effect(() => dispose)   // 闭包必须【返回】disposer，而不是调用它
+  ```
+  `ctx.effect(() => { dispose() })` 不匹配任何重载（Effect 类型要求闭包返回 `Disposable`）。这样插件 dispose 时 root 上的注册一并注销——否则换策略重挂载后，模型看到的仍是旧规则文本（解释与强制分叉）。
+- 教训（已写入回归测试）：跨 fiber 的效果注册必须回答"谁在何时注销它"；没有答案的注册就是泄漏。
+- 补救预算的正确键控：turn-stopping payload 携带 `turn` 回合号；任何"每回合重置"的计数都必须以它为键，而不是挂在 agent 对象上只增不减。
