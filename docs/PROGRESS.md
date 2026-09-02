@@ -14,11 +14,15 @@
 
 | 阶段 | 目标（对应计划书 Phase） | 状态 | 完成日期 | 阶段报告 | 关键 commit |
 |---|---|---|---|---|---|
-| Stage 0 | 仓库奠基：脚手架、文档体系、远端仓库、首次提交（Phase 0） | ✅ 完成 | 2026-09-03 | [stage-0](./stages/stage-0-仓库奠基.md) | 见下方提交记录 |
-| Stage 1 | 环境与 Harness 接入验证：装依赖、最小插件、核实 turn-stopping 阻止机制、产出 architecture.md（Phase 1） | ⬜ 未开始 | — | — | — |
-| Stage 2 | 策略与引擎核心：policy schema/loader/validator、evidence 归一化、constraint-engine 纯函数、单测（Phase 2 前半 + Phase 3/4 雏形） | ⬜ 未开始 | — | — | — |
-| Stage 3 | POC 集成测试：adapter 接线，四条测试 A/B/C/D 全绿（Phase 2 exit criterion） | ⬜ 未开始 | — | — | — |
-| Stage 4 | 收尾同步：README、进度更新、剩余工作清单 | ⬜ 未开始 | — | — | — |
+| Stage 0 | 仓库奠基：脚手架、文档体系、远端仓库、首次提交（Phase 0） | ✅ 完成 | 2026-09-03 | [stage-0](./stages/stage-0-仓库奠基.md) | cf73039 |
+| Stage 1 | 环境与 Harness 接入验证：装依赖、最小插件、核实 turn-stopping 阻止机制、产出 architecture.md（Phase 1） | ✅ 完成 | 2026-09-03 | [stage-1](./stages/stage-1-harness接入验证.md) | 见提交记录 |
+| Stage 2 | 策略与引擎核心：policy schema/loader/validator、evidence 归一化、constraint-engine 纯函数、单测（Phase 2 前半 + Phase 3/4 雏形） | ✅ 完成 | 2026-09-03 | [stage-2](./stages/stage-2-策略与引擎核心.md) | 见提交记录 |
+| Stage 3 | POC 集成测试：adapter 接线，四条测试 A/B/C/D 全绿（Phase 2 exit criterion） | ✅ 完成 | 2026-09-03 | [stage-3](./stages/stage-3-POC集成测试.md) | 见提交记录 |
+| Stage 4 | 收尾同步：README、进度更新、剩余工作清单 | ✅ 完成 | 2026-09-03 | [stage-4](./stages/stage-4-收尾同步.md) | 见提交记录 |
+
+## 里程碑状态
+
+> ✅ **计划书 Phase 2 exit criterion 已达成（2026-09-03）**：集成测试证明 Agent 无法在违反硬项目策略时成功完成任务（Case B 硬拒绝 / Case C 补救后放行），补救路径可解除阻止。`pnpm demo` 可复现。
 
 ## 后续阶段（本轮 1 小时之外，按计划书继续）
 
@@ -37,7 +41,18 @@
 
 | 日期 | commit | 说明 |
 |---|---|---|
-| 2026-09-03 | （本次） | chore: initialize dsh-policy plugin — Stage 0 仓库奠基 |
+| 2026-09-03 | cf73039 | chore: initialize dsh-policy plugin — Stage 0 仓库奠基 |
+| 2026-09-03 | （本次） | feat: add policy schema, evidence recorder, and constraint engine — Stage 2 核心 |
+| 2026-09-03 | （本次） | feat: enforce hard policy at the harness turn boundary — Stage 1/3 接入与 POC |
+| 2026-09-03 | （本次） | docs: harness architecture findings + stage reports — Stage 1/4 文档 |
+
+## 剩余工作（下一小时/下一阶段）
+
+- `ctx.systemPrompt.context()` 注入"生效中的硬规则摘要"（解释与强制分离，计划 §11.3）；
+- 工具级硬门禁 `tools/pre-execute deny` 接线；
+- matchers 从 policy.json 读取（现为插件 options）；跨 session 证据关联与持久化（Phase 4 完整形态）；
+- 多规则泛化与 Constraint Monotonicity 测试（Phase 3/5）；
+- CI（GitHub Actions：typecheck + test）与 npm 发布前打包。
 
 ## 硬性流程约定
 
