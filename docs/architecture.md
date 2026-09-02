@@ -54,3 +54,10 @@ turn/start → [preStep: agent/pre-step waterfall (reject|enter)] → step … s
 - Phase 5（引擎泛化）可继续用 inject+throw 双通道；`tools/pre-execute deny` 留作工具级硬门禁。
 - 证据按 agent（WeakMap）隔离已实现；跨 session 关联与持久化留给 Phase 4。
 - `ctx.systemPrompt.context()` 注入"生效中的硬规则摘要"尚未接线（计划 §11.3 的"解释与强制分离"），列为 Stage 5+ 工作。
+
+## 8. Stage 6 补充核实：prompt 上下文的作用域可见性（实测踩坑）
+
+- **插件 fiber 与 loop fiber 是兄弟 scope**：在插件 `apply(ctx)` 内直接 `ctx.systemPrompt.context(...)` 注册的动态上下文，对 agent loop 的 prompt 组装**完全不可见**（loop 经自己 scope 链调用 `systemPrompt.assemble`）。必须注册到 **`ctx.root`** scope（官方语义的 global 层，"scoped shadows global"）。已实测验证：root 注册后每一步请求的 messages 都包含规则摘要。
+- **PromptContext 不是 system 槽文本**：`context()` 的产物是 durable user-role 快照，追加进每步请求的 `messages`（preStep 中 `[...claimed, context]`）；`system` 字段仍由 section/persona 组成。
+- 取舍记录：root 注册的 effect 归 root 所有，插件 dispose 不会自动摘除（HMR 场景需自行管理 disposer）。MVP 接受此取舍，Stage 8+ 可改为 `ctx.effect` 包装。
+- 工具级门禁实测：`tools/pre-execute` 返回 `{ kind:'deny', reason }`（不调 `next()`）→ 错误结果回给模型，工具体从未执行——MUST NOT 规则的正确挂点。
