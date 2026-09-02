@@ -19,6 +19,8 @@ export interface TestStack {
   typecheckSuite: { passing: boolean }
   forbidden: { executed: boolean }
   agent: Agent
+  /** The dsh-policy plugin fiber — undefined when mounted with `mountPolicy: false`. */
+  policyFiber: Awaited<ReturnType<Context['plugin']>> | undefined
 }
 
 export function turnEndReasons(agent: Agent): string[] {
@@ -42,6 +44,8 @@ export function turnEndPayloads(agent: Agent): { turn: number; reason: unknown }
 export async function buildStack(
   script: StreamChunk[][],
   policyOptions: DshPolicyOptions = {},
+  mountPolicy = true,
+  sessionId?: string,
 ): Promise<TestStack> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
@@ -111,14 +115,14 @@ export async function buildStack(
     },
   }))
 
-  await ctx.plugin(dshPolicy, policyOptions)
+  const policyFiber = mountPolicy ? await ctx.plugin(dshPolicy, policyOptions) : undefined
 
-  const agent = await ctx.agentLoop.create(SessionId(`dsh-policy-test-${Math.random().toString(36).slice(2, 8)}`), {
+  const agent = await ctx.agentLoop.create(SessionId(sessionId ?? `dsh-policy-test-${Math.random().toString(36).slice(2, 8)}`), {
     provider: 'mock',
     model: 'mock',
   })
 
-  return { ctx, adapter, testSuite, typecheckSuite, forbidden, agent }
+  return { ctx, adapter, testSuite, typecheckSuite, forbidden, agent, policyFiber }
 }
 
 export function userSay(agent: Agent, text: string): void {

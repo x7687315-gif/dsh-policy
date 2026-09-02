@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { evaluatePolicy, type Violation } from '../engine/constraint-engine.ts'
-import { EvidenceRecorder } from '../evidence/recorder.ts'
+import { JsonlEvidenceStore } from '../evidence/store.ts'
 import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
 import { resolvePolicies, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
 import type { DenyToolsRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
@@ -40,19 +40,22 @@ export interface DshPolicyOptions {
    * turn-stopping checkpoint before refusing the turn outright (default 2).
    */
   maxRemediations?: number
+  /**
+   * Directory for durable session evidence (JSONL, one file per session).
+   * Undefined (default) keeps evidence in memory only. Persisted evidence is
+   * re-hydrated when a session resumes, so an unremediated violation survives
+   * a process restart.
+   */
+  evidenceRoot?: string
   debug?: boolean
 }
 
-function recorderFor(agent: object, store: WeakMap<object, EvidenceRecorder>): EvidenceRecorder {
-  let recorder = store.get(agent)
-  if (recorder === undefined) {
-    recorder = new EvidenceRecorder()
-    store.set(agent, recorder)
-  }
-  return recorder
+/** Session identity of an agent; evidence is correlated per session (plan §Phase 4). */
+function sessionIdOf(agent: unknown): string {
+  const id = (agent as { session?: { id?: unknown } } | undefined)?.session?.id
+  return typeof id === 'string' ? id : 'unknown-session'
 }
 
-/** Describe the resolved rule set for the model — explanation, not enforcement. */
 export function summarizeRules(resolution: Resolution): string {
   const lines: string[] = ['[dsh-policy] Active hard project rules (runtime-enforced, not optional):']
   for (const rule of resolution.rules) {
@@ -129,7 +132,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
     if (rule.trigger === 'always') for (const tool of (rule as DenyToolsRule).denyTools) denied.set(tool, rule.id)
   }
 
-  const recorders = new WeakMap<object, EvidenceRecorder>()
+  const store = new JsonlEvidenceStore(options.evidenceRoot)
   const remediationsUsed = new WeakMap<object, number>()
   const log = (message: string): void => {
     if (options.debug === true) ctx.logger?.info(`[dsh-policy] ${message}`)
@@ -140,7 +143,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
     const ruleId = denied.get(exec.name)
     if (ruleId !== undefined) {
       const agent = exec.agent
-      if (agent !== undefined) recorderFor(agent, recorders).record({ kind: 'tool_denied', at: Date.now(), tool: exec.name, ruleId })
+      if (agent !== undefined) store.record(sessionIdOf(agent), { kind: 'tool_denied', at: Date.now(), tool: exec.name, ruleId })
       log(`denied ${exec.name} by ${ruleId}`)
       const rule = resolution.rules.find(candidate => candidate.id === ruleId) as DenyToolsRule | undefined
       return { kind: 'deny', reason: rule?.remediation ?? `Denied by hard project policy "${ruleId}": ${exec.name} is a forbidden tool.` }
@@ -152,9 +155,9 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const agent = exec.agent
     if (agent !== undefined) {
-      const recorder = recorderFor(agent, recorders)
+      const sessionId = sessionIdOf(agent)
       if (codeChangeTools.has(exec.name)) {
-        recorder.record({
+        store.record(sessionId, {
           kind: 'code_change',
           at: Date.now(),
           tool: exec.name,
@@ -168,7 +171,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
           ? result.value
           : JSON.stringify(result.value ?? result.content)
         const passed = pattern === undefined ? true : new RegExp(pattern).test(text)
-        recorder.record({ kind: 'tool_pass', at: Date.now(), tool: exec.name, passed, detail: text.slice(0, 200) })
+        store.record(sessionId, { kind: 'tool_pass', at: Date.now(), tool: exec.name, passed, detail: text.slice(0, 200) })
         log(`tool_pass recorded via ${exec.name}: ${passed ? 'passed' : 'failed'}`)
       }
     }
@@ -178,7 +181,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   // Turn-boundary hard gate with remediation loop.
   ctx.on('agent/turn-stopping', (payload) => {
     const { agent } = payload
-    const evaluation = evaluatePolicy(resolution, recorderFor(agent, recorders))
+    const evaluation = evaluatePolicy(resolution, store.recorderFor(sessionIdOf(agent)))
     if (evaluation.status === 'PASS') return
 
     const used = remediationsUsed.get(agent) ?? 0
