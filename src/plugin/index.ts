@@ -3,7 +3,13 @@ import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { evaluatePolicy, type Violation } from '../engine/constraint-engine.ts'
 import { EvidenceRecorder } from '../evidence/recorder.ts'
 import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
-import type { PolicyDocument } from '../policy/schema.ts'
+import { resolvePolicies, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
+import type { DenyToolsRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
+import {
+  DEFAULT_CODE_CHANGE_TOOLS,
+  DEFAULT_VERIFICATION_TOOLS,
+  requireTool,
+} from '../policy/schema.ts'
 
 export const name = 'dsh-policy'
 export const inject: string[] = []
@@ -22,34 +28,20 @@ export class PolicyViolationError extends Error {
   }
 }
 
-export interface TestRunToolMatcher {
-  /** Harness tool name that runs a test suite. */
-  name: string
-  /** Regex tested against the tool's result value to decide `passed`. */
-  passPattern: string
-}
-
 export interface DshPolicyOptions {
   /** Inline policy document (takes precedence over `policyPath`). */
   policy?: PolicyDocument
   /** Explicit policy file location; defaults to `<cwd>/.dsh-policy/policy.json`. */
   policyPath?: string
+  /** Scope attributed to the single document provided via options (default `project`). */
+  scope?: RuleScope
   /**
    * How often the plugin re-injects a remediation instruction at the
    * turn-stopping checkpoint before refusing the turn outright (default 2).
    */
   maxRemediations?: number
-  /** Tools whose execution counts as a code change. */
-  codeChangeTools?: string[]
-  /** Tools whose execution counts as a test run, with their pass pattern. */
-  testRunTools?: TestRunToolMatcher[]
   debug?: boolean
 }
-
-const DEFAULT_CODE_CHANGE_TOOLS = ['edit_file', 'write_file', 'apply_patch']
-const DEFAULT_TEST_RUN_TOOLS: TestRunToolMatcher[] = [
-  { name: 'run_tests', passPattern: '\\bPASSED\\b' },
-]
 
 function recorderFor(agent: object, store: WeakMap<object, EvidenceRecorder>): EvidenceRecorder {
   let recorder = store.get(agent)
@@ -58,6 +50,22 @@ function recorderFor(agent: object, store: WeakMap<object, EvidenceRecorder>): E
     store.set(agent, recorder)
   }
   return recorder
+}
+
+/** Describe the resolved rule set for the model — explanation, not enforcement. */
+export function summarizeRules(resolution: Resolution): string {
+  const lines: string[] = ['[dsh-policy] Active hard project rules (runtime-enforced, not optional):']
+  for (const rule of resolution.rules) {
+    if (rule.trigger === 'always') {
+      const deny = rule as DenyToolsRule
+      lines.push(`- ${deny.id}: MUST NOT call tools [${deny.denyTools.join(', ')}]`)
+    } else {
+      const pass = rule as ToolPassRule
+      const requirement = typeof pass.require === 'string' ? pass.require : `a passing "${pass.require.tool}" run`
+      lines.push(`- ${pass.id}: after code changes, ${requirement} must hold (verified from real tool results, not from your claims)`)
+    }
+  }
+  return lines.join('\n')
 }
 
 function remediationMessage(violations: readonly Violation[]): UserMessage {
@@ -69,24 +77,57 @@ function remediationMessage(violations: readonly Violation[]): UserMessage {
 }
 
 /**
- * dsh-policy runtime (Stage 3 wiring).
+ * dsh-policy runtime, v1.
  *
- * Enforcement seams (verified against DeepSeek Harness):
+ * Enforcement seams (verified against DeepSeek Harness, see docs/architecture.md):
+ * - `tools/pre-execute` (waterfall): MUST NOT rules deny the call outright —
+ *   the tool body never runs.
  * - `tools/post-execute` (waterfall): observe real tool results → normalized
  *   evidence. Runtime truth beats model claims.
- * - `agent/turn-stopping` (serial checkpoint): evaluate hard constraints.
- *   While violated and within the remediation budget, inject a remediation
- *   user message — the loop re-opens the turn (verified: the checkpoint re-reads
- *   the inbox, a spliced message forces another step). Beyond the budget,
- *   throw so the turn can only end as an error, never as a silent completion.
+ * - `agent/turn-stopping` (serial checkpoint): evaluate pass-rules. While
+ *   violated and within the remediation budget, inject a remediation user
+ *   message — the loop re-opens the turn. Beyond the budget, throw so the
+ *   turn can only end as an error, never as a silent completion.
+ * - `ctx.systemPrompt.context()`: the model is TOLD the rules (explanation);
+ *   the runtime enforces them independently (plan §11.3).
  */
 export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
-  const policy: PolicyDocument = options.policy
+  const document: PolicyDocument = options.policy
     ?? loadPolicyFile(options.policyPath ?? resolvePolicyPath())
 
-  const codeChangeTools = new Set(options.codeChangeTools ?? DEFAULT_CODE_CHANGE_TOOLS)
-  const testRunTools = options.testRunTools ?? DEFAULT_TEST_RUN_TOOLS
-  const maxRemediations = options.maxRemediations ?? 2
+  const resolution = resolvePolicies([
+    { scope: options.scope ?? 'project', document },
+  ])
+  if (resolution.conflicts.length > 0) {
+    throw new Error(`dsh-policy: conflicting rule ids in policy: ${[...new Set(resolution.conflicts)].join(', ')}`)
+  }
+
+  // Evidence matchers: document config > built-in defaults; rule-level
+  // explicit passPattern wins over everything.
+  const codeChangeTools = new Set(document.evidence?.codeChangeTools ?? DEFAULT_CODE_CHANGE_TOOLS)
+  const patterns = new Map<string, string>()
+  for (const entry of DEFAULT_VERIFICATION_TOOLS) patterns.set(entry.tool, entry.passPattern)
+  for (const entry of document.evidence?.verificationTools ?? []) {
+    if (entry.passPattern !== undefined) patterns.set(entry.tool, entry.passPattern)
+  }
+  for (const rule of resolution.rules) {
+    if (rule.trigger === 'code_change' && typeof rule.require !== 'string' && rule.require.passPattern !== undefined) {
+      patterns.set(requireTool(rule), rule.require.passPattern)
+    }
+  }
+  // Which verification tools to watch at all: those the rules require, plus
+  // any explicitly configured ones.
+  const watchTools = new Set<string>()
+  for (const rule of resolution.rules) {
+    if (rule.trigger === 'code_change') watchTools.add(requireTool(rule as ToolPassRule))
+  }
+  for (const entry of document.evidence?.verificationTools ?? []) watchTools.add(entry.tool)
+
+  // MUST NOT rules → tool name → rule id.
+  const denied = new Map<string, string>()
+  for (const rule of resolution.rules) {
+    if (rule.trigger === 'always') for (const tool of (rule as DenyToolsRule).denyTools) denied.set(tool, rule.id)
+  }
 
   const recorders = new WeakMap<object, EvidenceRecorder>()
   const remediationsUsed = new WeakMap<object, number>()
@@ -94,6 +135,20 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
     if (options.debug === true) ctx.logger?.info(`[dsh-policy] ${message}`)
   }
 
+  // Hard MUST NOT gate: deny before the tool body can run.
+  ctx.on('tools/pre-execute', async (exec, next) => {
+    const ruleId = denied.get(exec.name)
+    if (ruleId !== undefined) {
+      const agent = exec.agent
+      if (agent !== undefined) recorderFor(agent, recorders).record({ kind: 'tool_denied', at: Date.now(), tool: exec.name, ruleId })
+      log(`denied ${exec.name} by ${ruleId}`)
+      const rule = resolution.rules.find(candidate => candidate.id === ruleId) as DenyToolsRule | undefined
+      return { kind: 'deny', reason: rule?.remediation ?? `Denied by hard project policy "${ruleId}": ${exec.name} is a forbidden tool.` }
+    }
+    return next()
+  })
+
+  // Evidence collection from real results.
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const agent = exec.agent
     if (agent !== undefined) {
@@ -107,35 +162,51 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
         })
         log(`code_change recorded via ${exec.name}`)
       }
-      const matcher = testRunTools.find(tool => tool.name === exec.name)
-      if (matcher !== undefined && !result.isError) {
+      if (watchTools.has(exec.name) && !result.isError) {
+        const pattern = patterns.get(exec.name)
         const text = typeof result.value === 'string'
           ? result.value
           : JSON.stringify(result.value ?? result.content)
-        const passed = new RegExp(matcher.passPattern).test(text)
-        recorder.record({ kind: 'test_run', at: Date.now(), tool: exec.name, passed, detail: text.slice(0, 200) })
-        log(`test_run recorded via ${exec.name}: ${passed ? 'passed' : 'failed'}`)
+        const passed = pattern === undefined ? true : new RegExp(pattern).test(text)
+        recorder.record({ kind: 'tool_pass', at: Date.now(), tool: exec.name, passed, detail: text.slice(0, 200) })
+        log(`tool_pass recorded via ${exec.name}: ${passed ? 'passed' : 'failed'}`)
       }
     }
     return next()
   })
 
+  // Turn-boundary hard gate with remediation loop.
   ctx.on('agent/turn-stopping', (payload) => {
     const { agent } = payload
-    const evaluation = evaluatePolicy(policy, recorderFor(agent, recorders))
+    const evaluation = evaluatePolicy(resolution, recorderFor(agent, recorders))
     if (evaluation.status === 'PASS') return
 
     const used = remediationsUsed.get(agent) ?? 0
-    if (used < maxRemediations) {
+    if (used < (options.maxRemediations ?? 2)) {
       remediationsUsed.set(agent, used + 1)
-      log(`block: ${evaluation.violations.map(v => v.ruleId).join(', ')} → remediation ${used + 1}/${maxRemediations}`)
+      log(`block: ${evaluation.violations.map(v => v.ruleId).join(', ')} → remediation ${used + 1}/${options.maxRemediations ?? 2}`)
       agent.inject(remediationMessage(evaluation.violations))
       return
     }
 
-    log(`block: remediation budget exhausted → refusing completion`)
+    log('block: remediation budget exhausted → refusing completion')
     throw new PolicyViolationError(evaluation.violations)
   })
+
+  // The model is told the rules; the runtime enforces them independently.
+  // Registered on the ROOT scope: the agent loop assembles prompts from its
+  // own scope chain, and plugin fibers are siblings of the loop fiber — a
+  // plugin-scope registration would be invisible to every assembly.
+  try {
+    const root: Context = ctx.root
+    root.systemPrompt?.context({
+      name: 'dsh-policy',
+      order: 900,
+      text: summarizeRules(resolution),
+    })
+  } catch (error) {
+    log(`system-prompt context registration skipped: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 /** Object form for `ctx.plugin(dshPolicy, options)`; named exports serve the Cordis loader. */

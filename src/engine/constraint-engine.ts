@@ -1,6 +1,7 @@
 import type { EvidenceRecorder } from '../evidence/recorder.ts'
-import type { PolicyDocument } from '../policy/schema.ts'
-import { DEFAULT_REMEDIATION } from '../policy/schema.ts'
+import type { ToolPassRule } from '../policy/schema.ts'
+import { DEFAULT_REMEDIATION, requireTool } from '../policy/schema.ts'
+import type { Resolution } from '../policy/resolver.ts'
 
 export interface Violation {
   ruleId: string
@@ -14,27 +15,35 @@ export type Evaluation =
   | { status: 'BLOCK'; violations: Violation[] }
 
 /**
- * Pure policy evaluation: `evaluate(rules, evidence) → PASS | BLOCK`.
- * No Harness types, no I/O, fully deterministic — this is the part the four
- * POC tests pin down at engine level (plan §Phase 2).
+ * Pure policy evaluation over the resolved rule set:
+ * `evaluate(rules, evidence) → PASS | BLOCK`.
+ *
+ * Only `ToolPassRule`s are judged here — they are the rules whose evidence
+ * exists at the turn boundary. `DenyToolsRule`s are enforced earlier, at
+ * `tools/pre-execute`, so a denied call never even happens.
+ *
+ * No Harness types, no I/O, fully deterministic.
  */
-export function evaluatePolicy(policy: PolicyDocument, evidence: EvidenceRecorder): Evaluation {
+export function evaluatePolicy(resolution: Resolution, evidence: EvidenceRecorder): Evaluation {
   const violations: Violation[] = []
 
-  for (const rule of policy.policy.hard) {
-    // v0 understands exactly one trigger/requirement pair; the validator
-    // rejects anything else before it can reach this point.
-    if (rule.trigger === 'code_change' && rule.require === 'tests_pass') {
-      const changedAt = evidence.lastCodeChangeAt()
-      if (changedAt === undefined) continue // trigger never fired → rule not armed
-      if (!evidence.hasPassingTestSince(changedAt)) {
-        violations.push({
-          ruleId: rule.id,
-          requirement: rule.require,
-          reason: `code changed (at ${new Date(changedAt).toISOString()}) without a passing test run afterwards`,
-          remediation: rule.remediation ?? DEFAULT_REMEDIATION,
-        })
-      }
+  for (const rule of resolution.rules) {
+    if (rule.trigger !== 'code_change') continue // denyTools rules: pre-execute gate
+    const passRule = rule as ToolPassRule
+    const tool = requireTool(passRule)
+
+    const changedAt = evidence.lastCodeChangeAt()
+    if (changedAt === undefined) continue // trigger never fired → rule not armed
+
+    if (!evidence.hasPassingToolRunSince(changedAt, tool)) {
+      const requirement = typeof passRule.require === 'string' ? passRule.require : `tool_pass:${tool}`
+      violations.push({
+        ruleId: passRule.id,
+        requirement,
+        reason: `code changed (at ${new Date(changedAt).toISOString()}) without a passing "${tool}" run afterwards`,
+        remediation: passRule.remediation
+          ?? (requirement === 'tests_pass' ? DEFAULT_REMEDIATION : `Hard project policy violated: run "${tool}" and make it pass before finishing.`),
+      })
     }
   }
 

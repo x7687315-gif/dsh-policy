@@ -12,11 +12,18 @@ export type PolicyEvent =
       detail: string
     }
   | {
-      kind: 'test_run'
+      kind: 'tool_pass'
       at: number
-      /** Harness tool that executed the tests. */
+      /** Verification tool that ran (run_tests, typecheck, …). */
       tool: string
       /** Derived from the tool's actual result value, not from model text. */
       passed: boolean
       detail: string
+    }
+  | {
+      kind: 'tool_denied'
+      at: number
+      /** Tool whose execution was refused by a hard MUST NOT rule. */
+      tool: string
+      ruleId: string
     }

@@ -57,6 +57,8 @@ Agent says "done" without tests      → agent/turn-stopping evaluates the polic
 Agent runs tests, tests fail again   → BLOCK again (within the remediation budget)
 Budget exhausted while still violated → the turn can only end as an error (never a fake completion)
 Agent runs tests, tests pass         → PASS: the turn may complete
+Agent calls a MUST NOT tool          → tools/pre-execute denies the call before the body runs
+Every step                           → the model sees the active rules in its prompt (explanation ≠ enforcement)
 ```
 
 ## License

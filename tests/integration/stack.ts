@@ -16,6 +16,8 @@ export interface TestStack {
   ctx: Context
   adapter: ScriptedAdapter
   testSuite: { passing: boolean }
+  typecheckSuite: { passing: boolean }
+  forbidden: { executed: boolean }
   agent: Agent
 }
 
@@ -54,6 +56,8 @@ export async function buildStack(
   ctx.llm.registerAdapter(['mock'], adapter)
 
   const testSuite = { passing: true }
+  const typecheckSuite = { passing: true }
+  const forbidden = { executed: false }
   ctx.tools.register(defineTool({
     name: 'edit_file',
     description: 'Edit a project source file.',
@@ -81,6 +85,31 @@ export async function buildStack(
       return testSuite.passing ? 'ALL TESTS PASSED (12)' : 'TESTS FAILED: 2 failing'
     },
   }))
+  ctx.tools.register(defineTool({
+    name: 'typecheck',
+    description: 'Run the type checker.',
+    parameters: {},
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    async execute() {
+      return typecheckSuite.passing ? 'NO ISSUES (tsc)' : 'ERROR: 3 type errors'
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'drop_database',
+    description: 'Destroy the production database.',
+    parameters: {},
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    async execute() {
+      forbidden.executed = true
+      return 'database dropped'
+    },
+  }))
 
   await ctx.plugin(dshPolicy, policyOptions)
 
@@ -89,7 +118,7 @@ export async function buildStack(
     model: 'mock',
   })
 
-  return { ctx, adapter, testSuite, agent }
+  return { ctx, adapter, testSuite, typecheckSuite, forbidden, agent }
 }
 
 export function userSay(agent: Agent, text: string): void {

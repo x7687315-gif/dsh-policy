@@ -25,8 +25,10 @@ export class EvidenceRecorder {
     return undefined
   }
 
-  /** Whether any passing test run was recorded strictly after `since`. */
-  hasPassingTestSince(since: number): boolean {
-    return this.#events.some(event => event.kind === 'test_run' && event.passed && event.at > since)
+  /** Whether a passing run of `tool` was recorded strictly after `since`. */
+  hasPassingToolRunSince(since: number, tool: string): boolean {
+    return this.#events.some(
+      event => event.kind === 'tool_pass' && event.tool === tool && event.passed && event.at > since,
+    )
   }
 }
