@@ -67,8 +67,11 @@ export function validatePolicyDocument(input: unknown): PolicyValidation {
     }
 
     if (Array.isArray(rule['denyTools'])) {
-      // MUST NOT rule: always-on, enforced at tools/pre-execute.
-      if (rule['trigger'] !== undefined && !DENY_TRIGGERS.has(String(rule['trigger']))) {
+      // MUST NOT rule: always-on, enforced at tools/pre-execute. The trigger
+      // is REQUIRED — a deny rule that slips through unenforced because its
+      // shape was ambiguous is exactly the silent no-op this validator exists
+      // to prevent.
+      if (typeof rule['trigger'] !== 'string' || !DENY_TRIGGERS.has(rule['trigger'])) {
         errors.push(`${where}.trigger must be "always" for denyTools rules`)
       }
       const tools = rule['denyTools'] as unknown[]

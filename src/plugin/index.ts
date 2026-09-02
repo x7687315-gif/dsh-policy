@@ -12,7 +12,10 @@ import {
 } from '../policy/schema.ts'
 
 export const name = 'dsh-policy'
-export const inject: string[] = []
+// Activation waits for the system-prompt service: registering the rule
+// summary is not optional — a plugin that runs without it would enforce
+// rules the model has never been told about.
+export const inject = ['systemPrompt']
 
 /**
  * Thrown at the `agent/turn-stopping` checkpoint when hard constraints stay
@@ -59,13 +62,11 @@ function sessionIdOf(agent: unknown): string {
 export function summarizeRules(resolution: Resolution): string {
   const lines: string[] = ['[dsh-policy] Active hard project rules (runtime-enforced, not optional):']
   for (const rule of resolution.rules) {
-    if (rule.trigger === 'always') {
-      const deny = rule as DenyToolsRule
-      lines.push(`- ${deny.id}: MUST NOT call tools [${deny.denyTools.join(', ')}]`)
+    if ('denyTools' in rule) {
+      lines.push(`- ${rule.id}: MUST NOT call tools [${rule.denyTools.join(', ')}]`)
     } else {
-      const pass = rule as ToolPassRule
-      const requirement = typeof pass.require === 'string' ? pass.require : `a passing "${pass.require.tool}" run`
-      lines.push(`- ${pass.id}: after code changes, ${requirement} must hold (verified from real tool results, not from your claims)`)
+      const requirement = typeof rule.require === 'string' ? rule.require : `a passing "${rule.require.tool}" run`
+      lines.push(`- ${rule.id}: after code changes, ${requirement} must hold (verified from real tool results, not from your claims)`)
     }
   }
   return lines.join('\n')
@@ -99,7 +100,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
     ?? loadPolicyFile(options.policyPath ?? resolvePolicyPath())
 
   const resolution = resolvePolicies([
-    { scope: options.scope ?? 'project', document },
+    { scope: options.scope ?? document.scope ?? 'project', document },
   ])
   if (resolution.conflicts.length > 0) {
     throw new Error(`dsh-policy: conflicting rule ids in policy: ${[...new Set(resolution.conflicts)].join(', ')}`)
@@ -126,14 +127,18 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   }
   for (const entry of document.evidence?.verificationTools ?? []) watchTools.add(entry.tool)
 
-  // MUST NOT rules → tool name → rule id.
+  // MUST NOT rules → tool name → rule id. Membership by shape ('denyTools' in
+  // rule), not by trigger spelling, so a deny rule is never silently skipped.
   const denied = new Map<string, string>()
   for (const rule of resolution.rules) {
-    if (rule.trigger === 'always') for (const tool of (rule as DenyToolsRule).denyTools) denied.set(tool, rule.id)
+    if ('denyTools' in rule) for (const tool of rule.denyTools) denied.set(tool, rule.id)
   }
 
   const store = new JsonlEvidenceStore(options.evidenceRoot)
-  const remediationsUsed = new WeakMap<object, number>()
+  // Remediation budget is PER TURN (keyed by the turn-stopping payload's turn
+  // number): one exhausting turn must not strip later turns of their
+  // remediation chances.
+  const remediationsUsed = new WeakMap<object, Map<number, number>>()
   const log = (message: string): void => {
     if (options.debug === true) ctx.logger?.info(`[dsh-policy] ${message}`)
   }
@@ -180,19 +185,22 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
 
   // Turn-boundary hard gate with remediation loop.
   ctx.on('agent/turn-stopping', (payload) => {
-    const { agent } = payload
+    const { agent, turn } = payload
     const evaluation = evaluatePolicy(resolution, store.recorderFor(sessionIdOf(agent)))
     if (evaluation.status === 'PASS') return
 
-    const used = remediationsUsed.get(agent) ?? 0
-    if (used < (options.maxRemediations ?? 2)) {
-      remediationsUsed.set(agent, used + 1)
-      log(`block: ${evaluation.violations.map(v => v.ruleId).join(', ')} → remediation ${used + 1}/${options.maxRemediations ?? 2}`)
+    const budget = options.maxRemediations ?? 2
+    const perTurn = remediationsUsed.get(agent) ?? new Map<number, number>()
+    const used = perTurn.get(turn) ?? 0
+    if (used < budget) {
+      perTurn.set(turn, used + 1)
+      remediationsUsed.set(agent, perTurn)
+      log(`block: ${evaluation.violations.map(v => v.ruleId).join(', ')} → remediation ${used + 1}/${budget} (turn ${turn})`)
       agent.inject(remediationMessage(evaluation.violations))
       return
     }
 
-    log('block: remediation budget exhausted → refusing completion')
+    log(`block: remediation budget exhausted (turn ${turn}) → refusing completion`)
     throw new PolicyViolationError(evaluation.violations)
   })
 
@@ -200,13 +208,17 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   // Registered on the ROOT scope: the agent loop assembles prompts from its
   // own scope chain, and plugin fibers are siblings of the loop fiber — a
   // plugin-scope registration would be invisible to every assembly.
+  // The disposer is tied to THIS plugin fiber via ctx.effect: on dispose the
+  // rule text is unregistered, so a re-applied plugin never leaves stale
+  // policy text in the prompt (explanation must track enforcement, §11.3).
   try {
     const root: Context = ctx.root
-    root.systemPrompt?.context({
+    const dispose = root.systemPrompt?.context({
       name: 'dsh-policy',
       order: 900,
       text: summarizeRules(resolution),
     })
+    if (dispose !== undefined) ctx.effect(() => dispose)
   } catch (error) {
     log(`system-prompt context registration skipped: ${error instanceof Error ? error.message : String(error)}`)
   }
