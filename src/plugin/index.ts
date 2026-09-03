@@ -13,10 +13,13 @@ import {
 } from '../behavior/guard.ts'
 import { evaluatePolicy, type Evaluation, type Violation } from '../engine/constraint-engine.ts'
 import { guardsFromUserModel, readUserModelGuardRules } from '../usermodel/guards.ts'
+import { preferencesFromUserModel, readUserModelPreferenceRules, type ResolvedPreference } from '../usermodel/preferences.ts'
+import { resolveContext } from '../context/resolver.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
 import type { EvidenceRecorder } from '../evidence/recorder.ts'
 import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
-import { resolvePolicies, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
+import { resolvePolicies, summarizeRules, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
+export { summarizeRules }
 import type { DenyToolsRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
 import {
   DEFAULT_CODE_CHANGE_TOOLS,
@@ -83,6 +86,18 @@ export interface DshPolicyOptions {
    */
   userModelPath?: string
   debug?: boolean
+  /**
+   * User-confirmed soft preferences (plan §Phase 11-12). NON-BLOCKING and
+   * type-isolated from hard rules. Mirrors `guards`: inline here OR loaded
+   * from the user model via `userModelPath`. Stage 13 injects these at order
+   * 920 through the Context Resolver (relevance match + token budget).
+   */
+  preferences?: ResolvedPreference[]
+  /**
+   * Context Resolver tuning (Stage 13): token budget ceiling for the injected
+   * context bundle (default 800, roadmap §6.2).
+   */
+  context?: { tokenBudget?: number }
 }
 
 /** Session identity of an agent; evidence is correlated per session (plan §Phase 4). */
@@ -112,17 +127,12 @@ export function evaluateTurn(resolution: Resolution, evidence: EvidenceRecorder)
   }
 }
 
-export function summarizeRules(resolution: Resolution): string {
-  const lines: string[] = ['[dsh-policy] Active hard project rules (runtime-enforced, not optional):']
-  for (const rule of resolution.rules) {
-    if ('denyTools' in rule) {
-      lines.push(`- ${rule.id}: MUST NOT call tools [${rule.denyTools.join(', ')}]`)
-    } else {
-      const requirement = typeof rule.require === 'string' ? rule.require : `a passing "${rule.require.tool}" run`
-      lines.push(`- ${rule.id}: after code changes, ${requirement} must hold (verified from real tool results, not from your claims)`)
-    }
-  }
-  return lines.join('\n')
+// `summarizeRules` now lives in ../policy/resolver.ts (imported above) so the
+// pure Context Resolver can reuse it without a plugin → context layering cycle.
+
+/** Heuristic: does this string look like a file path worth tracking for preference relevance? */
+function isPathLike(value: string): boolean {
+  return /[/\\]/.test(value) || /\.(ts|tsx|js|jsx|py|go|rs|json|md|css|html|txt|yaml|yml)$/i.test(value)
 }
 
 function remediationMessage(violations: readonly Violation[]): UserMessage {
@@ -194,7 +204,13 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   // matching the file's role as user-controlled durable state).
   const userModelGuards = options.userModelPath !== undefined ? guardsFromUserModel(readUserModelGuardRules(options.userModelPath)) : []
   const guards = liveGuards([...userModelGuards, ...(options.guards ?? [])])
+  const userModelPrefs = options.userModelPath !== undefined
+    ? preferencesFromUserModel(readUserModelPreferenceRules(options.userModelPath))
+    : []
+  const preferences = [...userModelPrefs, ...(options.preferences ?? [])]
   let lastTaskText = '' // latest user message — the taskRegex channel matches against it
+  let recentFiles: string[] = [] // task-profile tracking for preference relevance (language/glob)
+  let recentTools: string[] = [] // recent tool names, for potential future tool-based relevance
   // Remediation budget is PER TURN (keyed by the turn-stopping payload's turn
   // number): one exhausting turn must not strip later turns of their
   // remediation chances.
@@ -228,6 +244,20 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
 
   // Evidence collection from real results.
   ctx.on('tools/post-execute', async (exec, result, next) => {
+    // Task-profile tracking for the Context Resolver: observe the tools run and
+    // the file paths touched (read-only, capped) so preference relevance by
+    // language/glob works at runtime, not just in unit tests.
+    recentTools.push(exec.name)
+    if (recentTools.length > 10) recentTools.shift()
+    const args = exec.arguments as Record<string, unknown> | undefined
+    if (args !== null && typeof args === 'object') {
+      for (const value of Object.values(args)) {
+        if (typeof value === 'string' && isPathLike(value)) {
+          recentFiles.push(value)
+          if (recentFiles.length > 20) recentFiles.shift()
+        }
+      }
+    }
     const agent = exec.agent
     if (agent !== undefined) {
       const sessionId = sessionIdOf(agent)
@@ -373,6 +403,25 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
       text: () => guardContextText([...alwaysGuards(guards), ...taskGuardsFor(guards, lastTaskText)]),
     })
     if (disposeGuards !== undefined) ctx.effect(() => disposeGuards)
+    // Preference layer (order 920): the LAST layer physically, so soft guidance
+    // can never sit above hard rules (900) or guards (910). Dynamic text is
+    // re-evaluated per assembly against the latest task profile, and it draws
+    // from the same Context Resolver the unit tests exercise.
+    const disposePrefs = root.systemPrompt?.context({
+      name: 'dsh-policy/preferences',
+      order: 920,
+      text: () => {
+        const bundle = resolveContext({
+          taskProfile: { userMessage: lastTaskText, recentFiles, recentTools },
+          resolution,
+          guards,
+          preferences,
+          tokenBudget: options.context?.tokenBudget,
+        })
+        return bundle.sections.find(section => section.order === 920)?.text ?? ''
+      },
+    })
+    if (disposePrefs !== undefined) ctx.effect(() => disposePrefs)
   } catch (error) {
     log(`system-prompt context registration skipped: ${error instanceof Error ? error.message : String(error)}`)
   }
