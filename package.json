@@ -19,10 +19,12 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "demo": "tsx examples/demo.ts",
-    "project": "tsx src/project/cli.ts",
+    "project": "tsx src/cli/main.ts project",
     "build": "tsdown",
     "bench": "tsx bench/run.ts",
-    "ui": "tsx src/ui/server.ts"
+    "ui": "tsx src/cli/main.ts ui",
+    "review": "tsx src/cli/main.ts review",
+    "init": "tsx src/cli/main.ts init"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
@@ -50,6 +52,11 @@
     }
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "bin",
+    "src/ui/static"
+  ],
+  "bin": {
+    "dsh-policy": "bin/dsh-policy.mjs"
+  }
 }

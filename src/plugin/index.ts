@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { createBehaviorRuntime, detectCorrection, type BehaviorOptions } from '../behavior/wire.ts'
@@ -17,7 +18,7 @@ import { preferencesFromUserModel, readUserModelPreferenceRules, type ResolvedPr
 import { resolveContext, goalContextText } from '../context/resolver.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
 import type { EvidenceRecorder } from '../evidence/recorder.ts'
-import { loadGlobalPolicy, loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
+import { globalPolicyPath, loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
 import { resolvePolicies, summarizeRules, validateScopeMonotonicity, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
 export { summarizeRules }
 import type { DenyToolsRule, HardRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
@@ -146,6 +147,58 @@ function sessionIdOf(agent: unknown): string {
   return typeof id === 'string' ? id : 'unknown-session'
 }
 
+export interface ProjectPolicyResolution {
+  document: PolicyDocument
+  source: 'inline' | 'explicit-path' | 'discovered' | 'absent' | 'inactive'
+}
+
+/**
+ * Project policy resolution with real-environment semantics (Stage 18):
+ *  - an explicit inline `policy` or `policyPath` is an assertion — a missing
+ *    or corrupt file fails LOUD (loadPolicyFile throws);
+ *  - the DEFAULT location (`<cwd>/.dsh-policy/policy.json`) is discovery —
+ *    when it does not exist yet the plugin runs with an empty rule set (a
+ *    fresh project must not take down the whole Harness session); a CORRUPT
+ *    default file still fails loud.
+ * Exported for tests; `apply()` uses it with `process.cwd()`.
+ */
+export function resolveProjectPolicy(
+  options: { policy?: PolicyDocument; policyPath?: string; projectId?: string },
+  cwd: string,
+  projectActive: boolean,
+): ProjectPolicyResolution {
+  if (!projectActive) {
+    return {
+      document: { project: options.projectId ?? 'inactive-project', scope: 'project', policy: { hard: [] } },
+      source: 'inactive',
+    }
+  }
+  if (options.policy !== undefined) return { document: options.policy, source: 'inline' }
+  if (options.policyPath !== undefined) return { document: loadPolicyFile(options.policyPath), source: 'explicit-path' }
+
+  const defaultPath = resolvePolicyPath(cwd)
+  if (!existsSync(defaultPath)) {
+    return {
+      document: { project: 'discovered-project', scope: 'project', policy: { hard: [] } },
+      source: 'absent',
+    }
+  }
+  return { document: loadPolicyFile(defaultPath), source: 'discovered' }
+}
+
+/**
+ * Global policy resolution: global is an OPTIONAL layer — a not-yet-created
+ * global file (default location or explicit path) means "no global rules";
+ * a corrupt one still fails loud via loadPolicyFile.
+ */
+export function resolveGlobalPolicy(
+  options: { globalPolicy?: PolicyDocument; globalPolicyPath?: string },
+): PolicyDocument | undefined {
+  if (options.globalPolicy !== undefined) return options.globalPolicy
+  const globalFile = options.globalPolicyPath ?? globalPolicyPath()
+  return existsSync(globalFile) ? loadPolicyFile(globalFile) : undefined
+}
+
 /**
  * Turn-boundary policy evaluation, **fail-closed**.
  *
@@ -216,22 +269,24 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
     projectActive = isActive(registry, options.projectId)
   }
 
-  const projectDocument: PolicyDocument = projectActive
-    ? (options.policy ?? loadPolicyFile(options.policyPath ?? resolvePolicyPath()))
-    // Inactive project: fall back to an empty document so downstream evidence
-    // config uses defaults and no rule text leaks into the resolution.
-    : { project: options.projectId ?? 'inactive-project', scope: 'project', policy: { hard: [] } }
+  // Project policy resolution. Real-environment semantics (Stage 18):
+  //  - an explicit inline `policy` or `policyPath` is an assertion — a missing
+  //    or corrupt file fails LOUD;
+  //  - the DEFAULT location (`<cwd>/.dsh-policy/policy.json`) is discovery —
+  //    when the file does not exist yet the plugin runs with an empty rule
+  //    set (a fresh project must not take down the whole Harness session;
+  //    a CORRUPT default file still fails loud via loadPolicyFile).
+  const projectResolution = resolveProjectPolicy(options, process.cwd(), projectActive)
+  const projectDocument: PolicyDocument = projectResolution.document
 
   const scopedPolicies: ScopedPolicy[] = [
     { scope: options.scope ?? projectDocument.scope ?? 'project', document: projectDocument },
   ]
 
   // Global rules apply universally — even for an inactive project, global still
-  // governs (strongest scope, never weakened by a paused project).
-  let globalDocument: PolicyDocument | undefined
-  if (options.globalPolicy !== undefined) globalDocument = options.globalPolicy
-  else if (options.globalPolicyPath !== undefined) globalDocument = loadPolicyFile(options.globalPolicyPath)
-  else globalDocument = loadGlobalPolicy()
+  // governs (strongest scope, never weakened by a paused project). See
+  // resolveGlobalPolicy: an absent global file means "no global rules".
+  const globalDocument = resolveGlobalPolicy(options)
   if (globalDocument !== undefined) {
     scopedPolicies.push({ scope: 'global', document: globalDocument })
   }

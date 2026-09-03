@@ -53,7 +53,16 @@ export interface UiServerOptions {
   evidenceRoot?: string
 }
 
-const STATIC_DIR = join(dirname(fileURLToPath(import.meta.url)), 'static')
+// Static files live next to this module when run from source (src/ui/server.ts)
+// and under <packageRoot>/src/ui/static when running from the bundled dist/cli.mjs
+// — resolve the first candidate that exists so both source and installed runs work.
+const STATIC_DIR_CANDIDATES = [
+  join(dirname(fileURLToPath(import.meta.url)), 'static'),
+  resolve(dirname(fileURLToPath(import.meta.url)), '../src/ui/static'),
+  resolve(dirname(fileURLToPath(import.meta.url)), '../../src/ui/static'),
+]
+const STATIC_DIR = STATIC_DIR_CANDIDATES.find(candidate => existsSync(candidate))
+  ?? STATIC_DIR_CANDIDATES[0]!
 const BODY_LIMIT = 1_000_000
 
 interface JsonBody { [key: string]: unknown }
@@ -111,7 +120,15 @@ function writeJsonAtomic(path: string, value: unknown): void {
 }
 
 function loadPolicyOrNull(path: string): PolicyDocument | null {
-  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) as PolicyDocument : null
+  // The UI must stay usable even when a hand-edited policy file is corrupt —
+  // it renders "no rules" instead of dying (the PLUGIN still fails loud on
+  // corrupt files; only this read-only view is forgiving).
+  if (!existsSync(path)) return null
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as PolicyDocument
+  } catch {
+    return null
+  }
 }
 
 export interface UiServer {
@@ -364,29 +381,30 @@ export async function createUiServer(options: UiServerOptions = {}): Promise<UiS
   }
 }
 
-// --- CLI entry ----------------------------------------------------------------
+// --- CLI entry (dispatched by src/cli/main.ts; no self-execution) -------------
 
-function arg(name: string): string | undefined {
-  const index = process.argv.indexOf(`--${name}`)
-  return index === -1 ? undefined : process.argv[index + 1]
+function argFrom(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(`--${name}`)
+  return index === -1 ? undefined : argv[index + 1]
 }
 
-if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  const candidatesRoot = arg('candidates')
-  const userModelPath = arg('model')
-  const evidenceRoot = arg('evidence')
+/** Run the management UI. Exported for the unified CLI (`dsh-policy ui`). */
+export async function runUiCli(argv: string[]): Promise<void> {
+  const candidatesRoot = argFrom(argv, 'candidates')
+  const userModelPath = argFrom(argv, 'model')
+  const evidenceRoot = argFrom(argv, 'evidence')
   const server = await createUiServer({
-    port: arg('port') !== undefined ? Number(arg('port')) : 5178,
-    policyPath: arg('policy'),
-    globalPolicyPath: arg('global'),
+    port: argFrom(argv, 'port') !== undefined ? Number(argFrom(argv, 'port')) : 5178,
+    policyPath: argFrom(argv, 'policy'),
+    globalPolicyPath: argFrom(argv, 'global'),
     candidatesRoot,
     userModelPath,
-    projectRegistryPath: arg('registry'),
+    projectRegistryPath: argFrom(argv, 'registry'),
     evidenceRoot,
   })
   console.log('🧋 dsh-policy management UI')
   console.log(`   http://127.0.0.1:${server.port}`)
-  console.log(`   policy: ${arg('policy') ?? resolvePolicyPath()}`)
+  console.log(`   policy: ${argFrom(argv, 'policy') ?? resolvePolicyPath()}`)
   if (candidatesRoot !== undefined) console.log(`   candidates: ${candidatesRoot}`)
   if (userModelPath !== undefined) console.log(`   user model: ${userModelPath}`)
   console.log('   (localhost only — close with Ctrl+C)')

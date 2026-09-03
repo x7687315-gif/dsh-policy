@@ -5,8 +5,8 @@
  * candidates with their evidence, then applies the user's decisions to the
  * durable user model. This process is the ONLY writer of user state.
  *
- * Usage:
- *   pnpm tsx src/review/cli.ts --candidates <behaviorRoot> --model <userModelJson>
+ * Usage (standalone or via the unified CLI):
+ *   dsh-policy review --candidates <behaviorRoot> --model <userModelJson>
  *
  * Answers per candidate: y | e <message> | n | s   (confirm / edit / reject / skip)
  * Interactive on a TTY; with piped stdin, answers are consumed line by line
@@ -14,20 +14,12 @@
  */
 import { createInterface } from 'node:readline/promises'
 import { stdin, stdout } from 'node:process'
+import { resolve } from 'node:path'
 import { createBehaviorRuntime } from '../behavior/wire.ts'
 import { BehaviorStore } from '../behavior/store.ts'
 import { UserModelStore } from '../usermodel/store.ts'
 import type { CandidateBehavior } from '../behavior/types.ts'
 import { applyReview, type ReviewAction, type ReviewDecision } from './review.ts'
-
-function arg(name: string): string {
-  const index = process.argv.indexOf(`--${name}`)
-  if (index === -1 || process.argv[index + 1] === undefined) {
-    console.error(`missing required --${name} argument`)
-    process.exit(1)
-  }
-  return process.argv[index + 1]!
-}
 
 type ParsedAnswer = { action: Exclude<ReviewAction, 'edit'> } | { action: 'edit'; message: string }
 
@@ -43,17 +35,10 @@ function parseAnswer(answer: string): ParsedAnswer {
   return { action: 'skip' }
 }
 
-const candidatesRoot = arg('candidates')
-const modelPath = arg('model')
-
-const candidates: CandidateBehavior[] = new BehaviorStore(candidatesRoot).loadCandidates()
-if (candidates.length === 0) {
-  console.log('🧋 Nothing to review — no pending candidates.')
-  process.exit(0)
+function argFrom(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(`--${name}`)
+  return index === -1 ? undefined : argv[index + 1]
 }
-
-const store = new UserModelStore(modelPath)
-const behavior = createBehaviorRuntime({ enabled: true, root: candidatesRoot })
 
 function printCandidate(candidate: CandidateBehavior): void {
   console.log('─'.repeat(72))
@@ -71,7 +56,23 @@ function toDecision(candidate: CandidateBehavior, parsed: ParsedAnswer): ReviewD
     : { candidateId: candidate.id, action: parsed.action }
 }
 
-async function main(): Promise<void> {
+/** Run the review flow. Exported for the unified CLI (`dsh-policy review`). */
+export async function runReviewCli(argv: string[]): Promise<void> {
+  const candidatesRoot = argFrom(argv, 'candidates')
+  const modelPath = argFrom(argv, 'model')
+  if (candidatesRoot === undefined || modelPath === undefined) {
+    console.error('usage: dsh-policy review --candidates <behaviorRoot> --model <userModelJson>')
+    process.exit(1)
+  }
+
+  const candidates: CandidateBehavior[] = new BehaviorStore(candidatesRoot).loadCandidates()
+  if (candidates.length === 0) {
+    console.log('🧋 Nothing to review — no pending candidates.')
+    return
+  }
+
+  const store = new UserModelStore(resolve(modelPath))
+  const behavior = createBehaviorRuntime({ enabled: true, root: candidatesRoot })
   const decisions: ReviewDecision[] = []
 
   if (stdin.isTTY) {
@@ -85,7 +86,7 @@ async function main(): Promise<void> {
   } else {
     // Piped mode: consume all lines first (deterministic, scriptable).
     const lines: string[] = []
-    await new Promise<void>(resolve => {
+    await new Promise<void>(resolveLines => {
       let buffer = ''
       stdin.setEncoding('utf8')
       stdin.on('data', (chunk: string) => {
@@ -94,7 +95,7 @@ async function main(): Promise<void> {
         buffer = parts.pop() ?? ''
         lines.push(...parts)
       })
-      stdin.on('end', resolve)
+      stdin.on('end', resolveLines)
     })
     for (const candidate of candidates) {
       printCandidate(candidate)
@@ -105,8 +106,6 @@ async function main(): Promise<void> {
   const outcomes = applyReview(candidates, store, decisions, { via: 'review-cli', note: 'review' }, {
     onReject: signature => behavior?.reject(signature),
   })
-  // Confirmed/edited candidates must never re-surface in a later review run
-  // (a second confirm would create a duplicate durable record).
   for (const outcome of outcomes) {
     if (outcome.result === 'record-created') behavior?.markHandled(outcome.candidateId)
   }
@@ -115,7 +114,8 @@ async function main(): Promise<void> {
   for (const outcome of outcomes) {
     console.log(`${outcome.result.padEnd(16)} ${outcome.candidateId}${outcome.recordId !== undefined ? ` → ${outcome.recordId}` : ''}`)
   }
-  console.log(`\nUser model: ${modelPath}`)
+  console.log(`\nUser model: ${resolve(modelPath)}`)
 }
-
-await main()
+/* NOTE: no direct-execution guard here on purpose — `src/cli/main.ts` owns
+ * dispatch (single execution path, safe under bundling). Run via
+ * `dsh-policy review ...` or `pnpm tsx src/cli/main.ts review ...`. */

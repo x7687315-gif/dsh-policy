@@ -9,7 +9,7 @@
 - **仓库**：https://github.com/x7687315-gif/dsh-policy
 - **技术栈**：TypeScript 5 (ESM) / Node ≥ 20 / pnpm / vitest / DeepSeek Harness (`@deepseek-ai/dsh-*` 0.1.1-rc.2 锁定) / Cordis 4.0.2
 - **运行环境约束**：本地不做任何模型推理（测试使用 ScriptedAdapter，零 GPU 负载）；LLM 调用一律走 DeepSeek 云端 API。
-- **验证基线**：`pnpm test` 156/156 全绿（23 个测试文件）；`pnpm typecheck` 干净；`pnpm build` 产出 dist/index.mjs；`pnpm bench` 全量基准扫全绿（bench/report.json）；`pnpm ui` 本地 Web 管理界面。
+- **验证基线**：`pnpm test` 166/166 全绿（25 个测试文件，含 dist 打包产物测试）；`pnpm typecheck` 干净；`pnpm build` 多入口产物（库 + 统一 CLI）；`pnpm bench` 全量基准扫全绿（bench/report.json）；`pnpm ui` 本地 Web 管理界面（真实浏览器验证通过）。
 
 ## 阶段总表
 
@@ -29,7 +29,8 @@
 | Stage 11 | Behavior Guard：双注入通道（prompt 910 + post-execute 附加上下文）、类型隔离非阻塞不变量（Phase 8 ✅） | ✅ 完成 | 2026-09-03 | [stage-11](./stages/stage-11-BehaviorGuard.md) | fd62288 |
 | Stage 12 | User Model 单一写路径 + 审计、Review 流水线与 🧋 CLI（交互/管道双模式）、插件只读消费闭环（Phase 9/10 ✅，DSH UI 命令留 Stage 15） | ✅ 完成 | 2026-09-03 | [stage-12](./stages/stage-12-UserModel与Review.md) | c18ae09, b4e3865, 64fb67a |
 | Stage 16 | 基准测试：约束有效性/个性化有效性/成本三维度量化，发现并修复同毫秒证据序 P1 缺陷（Phase 18 ✅） | ✅ 完成 | 2026-09-03 | [stage-16](./stages/stage-16-基准测试.md) | 见提交记录 |
-| Stage 17 | Web 管理界面（计划外增强）：零依赖本地 UI，六标签页一站式管理规则/候选/提醒/偏好/生命周期/证据，写路径纪律完整保留 | ✅ 完成 | 2026-09-04 | [stage-17](./stages/stage-17-Web管理界面.md) | 见提交记录 |
+| Stage 17 | Web 管理界面（计划外增强）：零依赖本地 UI，六标签页一站式管理规则/候选/提醒/偏好/生命周期/证据，写路径纪律完整保留 | ✅ 完成 | 2026-09-04 | [stage-17](./stages/stage-17-Web管理界面.md) | 719bfcd |
+| Stage 18 | 真实环境验证与安装简化：dist 打包产物纳入测试、策略发现语义修正（缺失≠损坏）、统一 CLI（init/review/project/ui）+ bin 入口、真实浏览器 UI 验证 | ✅ 完成 | 2026-09-04 | [stage-18](./stages/stage-18-真实环境验证与安装简化.md) | 见提交记录 |
 
 ## 里程碑状态
 
@@ -48,6 +49,7 @@
 > ✅ **Phase 18 基准测试达成（2026-09-03，Stage 16）**：三维度量化——约束强制检出 100%/误拦截 0%/误放行 0%/补救成功 100%（36 例矩阵）、个性化机制精度/召回/送达 100%、成本每请求 ~315-491 tokens 线性开销 + 亚毫秒钩子 + **零额外 LLM 调用**（矩阵级断言）。**基准发现并修复同毫秒证据序 P1 缺陷**（误拦截 5.6% → 0%）。验证基线升至 **145/145 测试（22 文件）**。详见 [stage-16](./stages/stage-16-基准测试.md) 与 [benchmarks.md](./benchmarks.md)。
 > 🏁 **计划书 Phase 0-18 全部达成（2026-09-03）**——项目按原计划书的主线实施完毕，进入工程债清偿与部署阶段。
 > ✅ **Stage 17 Web 管理界面达成（2026-09-04，计划外增强）**：`pnpm ui` 一站式管理硬规则/候选/提醒/偏好/生命周期/证据；UI 作为第二个合法写者（用户代理），全部变更流经 `ConfirmRequest{via:'review-ui'}` + 审计；策略保存前强制校验（坏规则到不了磁盘）；仅绑定 127.0.0.1。验证基线升至 **156/156 测试（23 文件）**。详见 [stage-17](./stages/stage-17-Web管理界面.md)。
+> ✅ **Stage 18 真实环境验证与安装简化达成（2026-09-04）**：dist 打包产物纳入测试（CI 先构建；打包插件端到端强制验证）；发现语义修正——**缺失≠损坏**（缺省策略缺失=空规则集运行不炸会话，显式断言缺失/损坏仍响亮失败，全局层可选）；统一 CLI `dsh-policy init/review/project/ui` + bin 入口 + init 永不覆盖；真实浏览器操作 UI 验证（确认流→服务端持久化+审计核验+截图）。验证基线升至 **166/166 测试（25 文件）**。详见 [stage-18](./stages/stage-18-真实环境验证与安装简化.md)。
 
 ## 后续阶段（按计划书继续）
 
@@ -59,7 +61,8 @@
 | Stage 14 | 作用域完整实现（global 来源与 task scope）与项目生命周期 | Phase 13-14 | ✅ 完成 | [stage-14](./stages/stage-14-作用域与生命周期.md) / b96d721, 09fc271, b035056 |
 | Stage 15 | 全量 Harness 集成与端到端验收（场景 A-E） | Phase 16-17 | ✅ 完成 | [stage-15](./stages/stage-15-全量集成与端到端验收.md) / 398e3c2, ee67dea, ea64ce6, 160d3de |
 | Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 | ✅ 完成 | [stage-16](./stages/stage-16-基准测试.md) / 见提交记录 |
-| Stage 17 | Web 管理界面（一站式管理，计划外增强） | （超出原计划） | ✅ 完成 | [stage-17](./stages/stage-17-Web管理界面.md) / 见提交记录 |
+| Stage 17 | Web 管理界面（一站式管理，计划外增强） | （超出原计划） | ✅ 完成 | [stage-17](./stages/stage-17-Web管理界面.md) / 719bfcd |
+| Stage 18 | 真实环境验证与安装简化 | （超出原计划） | ✅ 完成 | [stage-18](./stages/stage-18-真实环境验证与安装简化.md) / 见提交记录 |
 
 ## 提交记录
 
@@ -103,7 +106,8 @@
 | 2026-09-03 | f1823c0 | fix: strictly-increasing evidence timestamps (P1 false-block found by bench) — Stage 16 |
 | 2026-09-03 | 1b5bf50 | docs: benchmarks.md + stage-16 report + PROGRESS sync — Stage 16 |
 | 2026-09-04 | aaa6fbc/806278f | docs: README overhaul (plugin guide / install / run / report collection) |
-| 2026-09-04 | （本次） | feat: web management UI — Stage 17 |
+| 2026-09-04 | 719bfcd | feat: web management UI — Stage 17 |
+| 2026-09-04 | （本次） | feat: real-env verification + install simplification — Stage 18 |
 
 > 注：审计与加固提交（36609ca、732c9d3、b118e14）位于 Stage 13-15 之前，已在里程碑区引用；API 通道推送的提交以远端 sha 为准。
 > 另：`64fb67a`（API 重建的 handled-candidates 修复）与本地的 `071e467` 为同一补丁，历史上以其为准；`806278f`（API 推送的 README 重构）与本地 `aaa6fbc` 同补丁。

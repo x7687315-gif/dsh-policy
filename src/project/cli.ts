@@ -5,11 +5,11 @@
  * runtime only READS this registry; this CLI is the sole writer of it AND the
  * sole mover of a project's policy directory on archive.
  *
- * Usage:
- *   pnpm tsx src/project/cli.ts pause    <id> [--registry <path>]
- *   pnpm tsx src/project/cli.ts resume   <id> [--registry <path>]
- *   pnpm tsx src/project/cli.ts complete <id> [--registry <path>]
- *   pnpm tsx src/project/cli.ts archive  <id> --dir <projectDir> [--registry <path>]
+ * Usage (via the unified CLI):
+ *   dsh-policy project pause    <id> [--registry <path>]
+ *   dsh-policy project resume   <id> [--registry <path>]
+ *   dsh-policy project complete <id> [--registry <path>]
+ *   dsh-policy project archive  <id> --dir <projectDir> [--registry <path>]
  *
  * `pause`/`complete`/`resume` only flip the state; a paused/completed/archived
  * project's rules are excluded from resolution by the plugin. `archive` additionally
@@ -25,10 +25,10 @@ import {
   type ProjectState,
 } from './registry.ts'
 
-function arg(name: string): string | undefined {
-  const index = process.argv.indexOf(`--${name}`)
+function argFrom(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(`--${name}`)
   if (index === -1) return undefined
-  const value = process.argv[index + 1]
+  const value = argv[index + 1]
   if (value === undefined || value.startsWith('--')) {
     console.error(`missing value for --${name}`)
     process.exit(1)
@@ -38,7 +38,7 @@ function arg(name: string): string | undefined {
 
 function usage(): void {
   console.error([
-    'usage: dsh-project <pause|resume|complete|archive> <id> [options]',
+    'usage: dsh-policy project <pause|resume|complete|archive> <id> [options]',
     '',
     '  pause    <id>  mark project paused (rules excluded from resolution)',
     '  resume   <id>  mark project active again',
@@ -51,40 +51,43 @@ function usage(): void {
   ].join('\n'))
 }
 
-const sub = process.argv[2]
-const id = process.argv[3]
+/** Run the lifecycle flow. Exported for the unified CLI (`dsh-policy project ...`). */
+export async function runProjectCli(argv: string[]): Promise<void> {
+  const sub = argv[0]
+  const id = argv[1]
 
-if (sub === undefined || id === undefined) {
-  usage()
-  process.exit(1)
-}
-
-const registryPath = arg('registry') ?? projectRegistryPath()
-const projectDir = arg('dir')
-
-switch (sub) {
-  case 'pause':
-  case 'resume':
-  case 'complete': {
-    const state: ProjectState = sub === 'pause' ? 'paused' : sub === 'complete' ? 'completed' : 'active'
-    const next = setProjectState(loadRegistry(registryPath), id, state)
-    saveRegistry(next, registryPath)
-    console.log(`project "${id}" → ${state}`)
-    break
+  if (sub === undefined || id === undefined) {
+    usage()
+    process.exit(1)
   }
-  case 'archive': {
-    if (projectDir === undefined) {
-      console.error('archive requires --dir <projectDir>')
+
+  const registryPath = argFrom(argv, 'registry') ?? projectRegistryPath()
+  const projectDir = argFrom(argv, 'dir')
+
+  switch (sub) {
+    case 'pause':
+    case 'resume':
+    case 'complete': {
+      const state: ProjectState = sub === 'pause' ? 'paused' : sub === 'complete' ? 'completed' : 'active'
+      const next = setProjectState(loadRegistry(registryPath), id, state)
+      saveRegistry(next, registryPath)
+      console.log(`project "${id}" → ${state}`)
+      break
+    }
+    case 'archive': {
+      if (projectDir === undefined) {
+        console.error('archive requires --dir <projectDir>')
+        usage()
+        process.exit(1)
+      }
+      archiveProject(id, projectDir, loadRegistry(registryPath), registryPath)
+      console.log(`project "${id}" → archived (policy moved to ${projectDir}/archive/)`)
+      break
+    }
+    default: {
+      console.error(`unknown subcommand: ${sub}`)
       usage()
       process.exit(1)
     }
-    archiveProject(id, projectDir, loadRegistry(registryPath), registryPath)
-    console.log(`project "${id}" → archived (policy moved to ${projectDir}/archive/)`)
-    break
-  }
-  default: {
-    console.error(`unknown subcommand: ${sub}`)
-    usage()
-    process.exit(1)
   }
 }

@@ -35,7 +35,7 @@ Subsystems behind that pipeline:
 | **Context Resolver** | Injects only task-relevant preferences/goals under a hard 800-token budget; hard rules are never evicted | prompt layers 920/925 |
 | **Project lifecycle** | Paused/completed/archived projects stop contributing rules | activation (registry) |
 
-Verification baseline: **156/156 tests** across 23 files, benchmarked end-to-end (see [docs/benchmarks.md](docs/benchmarks.md)), plus a local **web management UI** (`pnpm ui`) for point-and-click management of everything below.
+Verification baseline: **166/166 tests** across 25 files, benchmarked end-to-end (see [docs/benchmarks.md](docs/benchmarks.md)), a local **web management UI** (`pnpm ui`), and packaging tests that run against the built `dist/` bundle.
 
 ## Why
 
@@ -61,7 +61,7 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 
 > **Note:** the package is not yet published to npm. Until then, install from GitHub or a local checkout (see below); once published it will be `pnpm add dsh-policy`.
 
-### 1. Add the dependency
+### 1. Add the dependency & scaffold
 
 ```bash
 # from GitHub (pin a commit/tag for reproducibility)
@@ -69,6 +69,12 @@ pnpm add github:x7687315-gif/dsh-policy
 
 # or from a local checkout
 pnpm add ./path/to/dsh-policy
+```
+
+Then scaffold your first policy with the bundled CLI (never overwrites an existing file):
+
+```bash
+npx dsh-policy init            # creates .dsh-policy/policy.json with a working starter rule
 ```
 
 Requirements: Node ≥ 20, pnpm (or npm/yarn), and a DeepSeek Harness runtime with the Cordis loader.
@@ -143,14 +149,24 @@ The full schema (tool-pass rules, deny rules, evidence matchers, scopes, remedia
 
 ## Running things
 
+The unified CLI (installed as `dsh-policy` via the `bin` entry, or from the repo):
+
+```bash
+dsh-policy init      # scaffold .dsh-policy/policy.json (never overwrites)
+dsh-policy review    # interactive/piped candidate review
+dsh-policy project   # lifecycle: pause | resume | complete | archive
+dsh-policy ui        # local web management UI -> http://127.0.0.1:5178
+```
+
+From a repo checkout, the same commands work via pnpm scripts (`pnpm ui`, `pnpm review`, `pnpm project`, `pnpm init`) plus:
+
 ```bash
 pnpm install
-pnpm test        # 156 tests / 23 files — real Harness stack, scripted LLM (no API key needed)
+pnpm test        # 166 tests / 25 files — real Harness stack, scripted LLM (no API key needed)
 pnpm bench       # full benchmark sweep -> bench/report.json (constraint/personalization/cost)
-pnpm ui          # local web management UI -> http://127.0.0.1:5178
 pnpm demo        # end-to-end: BLOCK -> remediation injected -> tests run -> PASS
 pnpm typecheck   # strict TS, zero errors
-pnpm build       # tsdown -> dist/ (npm-publishable bundle)
+pnpm build       # tsdown -> dist/ (npm-publishable bundle, verified by packaging tests)
 ```
 
 ### 🖥️ Web management UI — point-and-click management
@@ -236,6 +252,7 @@ Every step                           → the model sees the active rules in its 
 - [x] Stage 15 — full composition: goal model, `cordis.yml`, scenarios A–E end-to-end
 - [x] Stage 16 — benchmarks: constraint effectiveness / personalization effectiveness / cost
 - [x] Stage 17 — web management UI (out-of-plan enhancement): point-and-click management of rules, candidates, guards, preferences, lifecycle
+- [x] Stage 18 — real-environment verification (dist bundle, discovery semantics, real-browser UI test) + install simplification (`dsh-policy init` / unified CLI / bin entry)
 
 Next: **hardening & deployment** — npm publish, cloud smoke test (DeepSeek key), registered engineering debts (see [docs/PROGRESS.md](docs/PROGRESS.md)).
 
@@ -275,6 +292,7 @@ Each stage below has a full report (what was done, how, and where the project st
 - [Stage 16 — 基准测试](docs/stages/stage-16-基准测试.md) — three-dimension benchmark + the P1 defect it caught
 - [Review round — 一致性/全局性/安全性审查](docs/stages/stage-review-一致性全局性安全性.md) — cross-cutting defect review
 - [Stage 17 — Web 管理界面](docs/stages/stage-17-Web管理界面.md) — out-of-plan enhancement: point-and-click management UI (planned extra)
+- [Stage 18 — 真实环境验证与安装简化](docs/stages/stage-18-真实环境验证与安装简化.md) — dist packaging tests, discovery semantics, real-browser UI verification, `dsh-policy init`
 
 **Reference documents**
 
