@@ -1,5 +1,18 @@
 # dsh-policy
 
+<p align="center">
+  <img src="docs/images/banner.jpg" alt="dsh-policy" width="720" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/x7687315-gif/dsh-policy/actions/workflows/ci.yml"><img src="https://github.com/x7687315-gif/dsh-policy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/tests-166%20passing-3ecf8e" alt="tests" />
+  <img src="https://img.shields.io/badge/node-%E2%89%A520-4da3ff" alt="node" />
+  <img src="https://img.shields.io/badge/license-MIT-8a93a6" alt="license" />
+  <img src="https://img.shields.io/badge/DeepSeek%20Harness-plugin-4da3ff" alt="harness" />
+  <a href="https://github.com/x7687315-gif/dsh-policy/issues"><img src="https://img.shields.io/badge/feedback-welcome-ffb454" alt="feedback" /></a>
+</p>
+
 **User-controlled policy & personalization runtime for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).**
 
 A policy-driven runtime extension that lets users define project-level **hard constraints** (MUST / MUST NOT / BLOCK), manage behavioral guidance and coding preferences, and incrementally build a user-controlled personalization system — **without giving the AI autonomous authority over long-term user rules**.
@@ -36,6 +49,22 @@ Subsystems behind that pipeline:
 | **Project lifecycle** | Paused/completed/archived projects stop contributing rules | activation (registry) |
 
 Verification baseline: **166/166 tests** across 25 files, benchmarked end-to-end (see [docs/benchmarks.md](docs/benchmarks.md)), a local **web management UI** (`pnpm ui`), and packaging tests that run against the built `dist/` bundle.
+
+## Screenshots
+
+The bundled web management UI (`pnpm ui` / `dsh-policy ui`) — localhost-only, point-and-click instead of config-file editing:
+
+**Dashboard — everything at a glance**
+
+<p align="center">
+  <img src="docs/images/ui-dashboard.png" alt="dsh-policy management UI — dashboard" width="720" />
+</p>
+
+**Behavior review — confirm / edit / reject observed patterns (evidence + confidence shown)**
+
+<p align="center">
+  <img src="docs/images/ui-candidates.png" alt="dsh-policy management UI — candidate review" width="720" />
+</p>
 
 ## Why
 
@@ -230,7 +259,7 @@ Every step                           → the model sees the active rules in its 
 
 ## Status
 
-**Stage 0–16 complete — the full project plan (Phase 0–18) is implemented.** Verification baseline: `pnpm test` **145/145** across 22 files, `pnpm typecheck` clean, `pnpm build` green, `pnpm bench` full-sweep benchmark green ([report](bench/report.json), [interpretation](docs/benchmarks.md)).
+**Stage 0–18 complete — the full project plan (Phase 0–18) plus the web management UI and real-environment hardening.** Verification baseline: `pnpm test` **166/166** across 25 files, `pnpm typecheck` clean, `pnpm build` green, `pnpm bench` full-sweep benchmark green ([report](bench/report.json), [interpretation](docs/benchmarks.md)).
 
 - [x] Stage 0 — repository foundation
 - [x] Stage 1 — Harness integration verification (turn-stopping blocking mechanism confirmed)
@@ -301,6 +330,14 @@ Each stage below has a full report (what was done, how, and where the project st
 - [docs/benchmarks.md](docs/benchmarks.md) — benchmark interpretation
 - [docs/roadmap.md](docs/roadmap.md) — technical plans for every stage
 - [docs/PROGRESS.md](docs/PROGRESS.md) — the live stage table & commit log
+
+## Community
+
+dsh-policy is part of the DeepSeek Harness plugin ecosystem ("Everything is a Plugin") — find it (and siblings) via the GitHub topics [`dsh`](https://github.com/topics/dsh) and [`dsh-plugin`](https://github.com/topics/dsh-plugin).
+
+- 🐛 Found a bug or want a feature? [Open an issue](https://github.com/x7687315-gif/dsh-policy/issues)
+- 🔀 PRs welcome — small, testable, explainable changes (see the plan's contribution philosophy)
+- 🧋 Feedback on the beta is especially valuable: does the three-layer model map to how YOU want to constrain your agents?
 
 ## License
 

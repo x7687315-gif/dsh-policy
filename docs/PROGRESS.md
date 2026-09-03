@@ -31,6 +31,7 @@
 | Stage 16 | 基准测试：约束有效性/个性化有效性/成本三维度量化，发现并修复同毫秒证据序 P1 缺陷（Phase 18 ✅） | ✅ 完成 | 2026-09-03 | [stage-16](./stages/stage-16-基准测试.md) | 见提交记录 |
 | Stage 17 | Web 管理界面（计划外增强）：零依赖本地 UI，六标签页一站式管理规则/候选/提醒/偏好/生命周期/证据，写路径纪律完整保留 | ✅ 完成 | 2026-09-04 | [stage-17](./stages/stage-17-Web管理界面.md) | 719bfcd |
 | Stage 18 | 真实环境验证与安装简化：dist 打包产物纳入测试、策略发现语义修正（缺失≠损坏）、统一 CLI（init/review/project/ui）+ bin 入口、真实浏览器 UI 验证 | ✅ 完成 | 2026-09-04 | [stage-18](./stages/stage-18-真实环境验证与安装简化.md) | 见提交记录 |
+| Stage 19 | 社区门面与官方生态接入：README 门面（宣传图/徽章/演示截图/Community）、加入 dsh/dsh-plugin 官方 topic 目录、npm 发布按用户决定暂缓 | ✅ 完成 | 2026-09-04 | [stage-19](./stages/stage-19-社区门面与官方生态.md) | 见提交记录 |
 
 ## 里程碑状态
 
@@ -50,6 +51,7 @@
 > 🏁 **计划书 Phase 0-18 全部达成（2026-09-03）**——项目按原计划书的主线实施完毕，进入工程债清偿与部署阶段。
 > ✅ **Stage 17 Web 管理界面达成（2026-09-04，计划外增强）**：`pnpm ui` 一站式管理硬规则/候选/提醒/偏好/生命周期/证据；UI 作为第二个合法写者（用户代理），全部变更流经 `ConfirmRequest{via:'review-ui'}` + 审计；策略保存前强制校验（坏规则到不了磁盘）；仅绑定 127.0.0.1。验证基线升至 **156/156 测试（23 文件）**。详见 [stage-17](./stages/stage-17-Web管理界面.md)。
 > ✅ **Stage 18 真实环境验证与安装简化达成（2026-09-04）**：dist 打包产物纳入测试（CI 先构建；打包插件端到端强制验证）；发现语义修正——**缺失≠损坏**（缺省策略缺失=空规则集运行不炸会话，显式断言缺失/损坏仍响亮失败，全局层可选）；统一 CLI `dsh-policy init/review/project/ui` + bin 入口 + init 永不覆盖；真实浏览器操作 UI 验证（确认流→服务端持久化+审计核验+截图）。验证基线升至 **166/166 测试（25 文件）**。详见 [stage-18](./stages/stage-18-真实环境验证与安装简化.md)。
+> ✅ **Stage 19 社区门面达成（2026-09-04）**：README 门面升级（宣传横幅/徽章行/管理台演示截图/Community 区）；仓库加入 `dsh`/`dsh-plugin`/`deepseek-harness` 等官方生态 topic（中文 topic 需网页端添加，已告知）；npm 发布按用户决定暂缓（先 Beta 测试）。详见 [stage-19](./stages/stage-19-社区门面与官方生态.md)。
 
 ## 后续阶段（按计划书继续）
 
@@ -63,6 +65,7 @@
 | Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 | ✅ 完成 | [stage-16](./stages/stage-16-基准测试.md) / 见提交记录 |
 | Stage 17 | Web 管理界面（一站式管理，计划外增强） | （超出原计划） | ✅ 完成 | [stage-17](./stages/stage-17-Web管理界面.md) / 719bfcd |
 | Stage 18 | 真实环境验证与安装简化 | （超出原计划） | ✅ 完成 | [stage-18](./stages/stage-18-真实环境验证与安装简化.md) / 见提交记录 |
+| Stage 19 | 社区门面与官方生态接入 | （超出原计划） | ✅ 完成 | [stage-19](./stages/stage-19-社区门面与官方生态.md) / 见提交记录 |
 
 ## 提交记录
 
@@ -108,6 +111,8 @@
 | 2026-09-04 | aaa6fbc/806278f | docs: README overhaul (plugin guide / install / run / report collection) |
 | 2026-09-04 | 719bfcd | feat: web management UI — Stage 17 |
 | 2026-09-04 | （本次） | feat: real-env verification + install simplification — Stage 18 |
+| 2026-09-04 | 0c6a77e | chore: remove smoke-test audit residue from fixtures |
+| 2026-09-04 | （本次） | docs: community facelift (banner/badges/screenshots) + ecosystem topics — Stage 19 |
 
 > 注：审计与加固提交（36609ca、732c9d3、b118e14）位于 Stage 13-15 之前，已在里程碑区引用；API 通道推送的提交以远端 sha 为准。
 > 另：`64fb67a`（API 重建的 handled-candidates 修复）与本地的 `071e467` 为同一补丁，历史上以其为准；`806278f`（API 推送的 README 重构）与本地 `aaa6fbc` 同补丁。
