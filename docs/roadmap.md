@@ -101,7 +101,7 @@ CandidateBehavior {
 - **签名去重**：`signature = kind + 规范化主体`（ruleId / 工具名 / 纠正消息的规范化摘要——小写、去数字与路径、词干化截断）。同签名观察聚到同一候选，`occurrences` 与 `distinctSessions` 递增。
 - **置信度（确定性公式，写进文档并配单测）**：
   `confidence = min(1, 0.2·min(occurrences,5)/5 + 0.4·min(distinctSessions,3)/3 + 0.2·recency + 0.2·signalQuality)`
-  其中 `recency = exp(-daysSinceLast/14)`；`signalQuality`：remediation/hard_block 类 = 1.0（运行时铁证），user_correction 启发式 = 0.4。阈值默认 `confidence ≥ 0.6 且 occurrences ≥ 3` 才升级为待审候选。
+  其中 `recency = exp(-daysSinceLast/14)`；`signalQuality`：remediation/hard_block 类 = 1.0（运行时铁证），user_correction 启发式 = 0.4。阈值默认 `confidence ≥ 0.6 且 occurrences ≥ 2`（**实现期修正**：原草案写 ≥3，但公式下单次出现封顶 0.573 永不晋级、双会话双次 ≈0.747 晋级——"运行时铁证出现两次"已值得给用户看，故取 2；阈值可配置）。
 - **候选升级**：观察日志（JSONL，套用 `JsonlEvidenceStore` 模式，独立目录 `observations/`）→ 阈值命中 → 写入候选队列 `candidates.json`（原子写：临时文件 + rename）。
 - **拒绝墓碑**：`rejected` 状态永久保留签名，同签名新观察继续累计但**永不**再次进入待审队列，除非用户显式重开（Stage 12 提供命令）。
 

@@ -1,5 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
+import { createBehaviorRuntime, detectCorrection, type BehaviorOptions } from '../behavior/wire.ts'
+import { ruleSignature, toolDenySignature } from '../behavior/signature.ts'
 import { evaluatePolicy, type Violation } from '../engine/constraint-engine.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
 import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
@@ -50,6 +52,13 @@ export interface DshPolicyOptions {
    * a process restart.
    */
   evidenceRoot?: string
+  /**
+   * Behavior observation (plan §Phase 7): deterministic, zero-extra-LLM-call
+   * pattern detection over this plugin's own enforcement actions plus a
+   * low-precision user-correction heuristic. Opt-in; candidates land in
+   * `behavior.root` for the Stage-12 review flow — never in user state.
+   */
+  behavior?: BehaviorOptions
   debug?: boolean
 }
 
@@ -135,6 +144,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   }
 
   const store = new JsonlEvidenceStore(options.evidenceRoot)
+  const behavior = createBehaviorRuntime(options.behavior)
   // Remediation budget is PER TURN (keyed by the turn-stopping payload's turn
   // number): one exhausting turn must not strip later turns of their
   // remediation chances.
@@ -148,7 +158,17 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
     const ruleId = denied.get(exec.name)
     if (ruleId !== undefined) {
       const agent = exec.agent
-      if (agent !== undefined) store.record(sessionIdOf(agent), { kind: 'tool_denied', at: Date.now(), tool: exec.name, ruleId })
+      if (agent !== undefined) {
+        const sessionId = sessionIdOf(agent)
+        store.record(sessionId, { kind: 'tool_denied', at: Date.now(), tool: exec.name, ruleId })
+        behavior?.note({
+          kind: 'tool_denied_repeated',
+          signature: toolDenySignature(exec.name),
+          sessionId,
+          at: Date.now(),
+          detail: `denied by ${ruleId}`,
+        })
+      }
       log(`denied ${exec.name} by ${ruleId}`)
       const rule = resolution.rules.find(candidate => candidate.id === ruleId) as DenyToolsRule | undefined
       return { kind: 'deny', reason: rule?.remediation ?? `Denied by hard project policy "${ruleId}": ${exec.name} is a forbidden tool.` }
@@ -186,7 +206,8 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   // Turn-boundary hard gate with remediation loop.
   ctx.on('agent/turn-stopping', (payload) => {
     const { agent, turn } = payload
-    const evaluation = evaluatePolicy(resolution, store.recorderFor(sessionIdOf(agent)))
+    const sessionId = sessionIdOf(agent)
+    const evaluation = evaluatePolicy(resolution, store.recorderFor(sessionId))
     if (evaluation.status === 'PASS') return
 
     const budget = options.maxRemediations ?? 2
@@ -196,12 +217,52 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
       perTurn.set(turn, used + 1)
       remediationsUsed.set(agent, perTurn)
       log(`block: ${evaluation.violations.map(v => v.ruleId).join(', ')} → remediation ${used + 1}/${budget} (turn ${turn})`)
+      for (const violation of evaluation.violations) {
+        behavior?.note({
+          kind: 'remediation_repeated',
+          signature: ruleSignature('remediation_repeated', violation.ruleId),
+          sessionId,
+          at: Date.now(),
+          detail: violation.reason,
+        })
+      }
       agent.inject(remediationMessage(evaluation.violations))
       return
     }
 
     log(`block: remediation budget exhausted (turn ${turn}) → refusing completion`)
+    for (const violation of evaluation.violations) {
+      behavior?.note({
+        kind: 'hard_block_repeated',
+        signature: ruleSignature('hard_block_repeated', violation.ruleId),
+        sessionId,
+        at: Date.now(),
+        detail: violation.reason,
+      })
+    }
     throw new PolicyViolationError(evaluation.violations)
+  })
+
+  // Behavior observation: user-correction heuristic over the session firehose.
+  // Low precision BY DESIGN — it can only ever produce a candidate for the
+  // user to review, never durable state (plan §Phase 7 boundary).
+  ctx.on('session/event', (session, event) => {
+    if (behavior === undefined || event.type !== 'user/message') return
+    const message = event.data as { source?: { kind?: string }; content?: { type: string; text?: string }[] }
+    if (message.source?.kind !== 'user') return
+    const text = (message.content ?? [])
+      .filter(block => block.type === 'text')
+      .map(block => block.text ?? '')
+      .join(' ')
+    const signature = detectCorrection(text, options.behavior)
+    if (signature === undefined) return
+    behavior.note({
+      kind: 'user_correction',
+      signature,
+      sessionId: typeof session.id === 'string' ? session.id : 'unknown-session',
+      at: Date.now(),
+      detail: 'short corrective user message',
+    })
   })
 
   // The model is told the rules; the runtime enforces them independently.

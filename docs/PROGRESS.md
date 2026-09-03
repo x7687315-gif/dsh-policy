@@ -24,7 +24,8 @@
 | Stage 6 | 插件 v1：策略驱动 matchers、MUST NOT 门禁（pre-execute deny）、规则注入 prompt | ✅ 完成 | 2026-09-03 | [stage-6](./stages/stage-6-MUST-NOT门禁与规则可见性.md) | f32ee0d |
 | Stage 7 | CI（GitHub Actions）与文档同步 | ✅ 完成 | 2026-09-03 | 本表 | 6c84051 |
 | Stage 8 | 证据 JSONL 持久化（按会话键控、重启不失忆）、HMR 安全测试、tsdown 发布形态、策略编写指南（Phase 4 收尾 ✅） | ✅ 完成 | 2026-09-03 | [stage-8](./stages/stage-8-持久化与HMR安全.md) | 1a478ab |
-| Stage 9 | 全量缺陷审查与修复：补救预算按回合重置、root 注册卸载清理、deny trigger 收紧（+3 回归测试） | ✅ 完成 | 2026-09-03 | [stage-9](./stages/stage-9-缺陷审查与修复.md) | 见提交记录 |
+| Stage 9 | 全量缺陷审查与修复：补救预算按回合重置、root 注册卸载清理、deny trigger 收紧（+3 回归测试） | ✅ 完成 | 2026-09-03 | [stage-9](./stages/stage-9-缺陷审查与修复.md) | d9584bf |
+| Stage 10 | 行为观察引擎：4 类信号、确定性置信度、签名去重、拒绝墓碑、JSONL+原子投影、opt-in（Phase 7 ✅） | ✅ 完成 | 2026-09-03 | [stage-10](./stages/stage-10-行为观察引擎.md) | 见提交记录 |
 
 ## 里程碑状态
 
@@ -33,6 +34,7 @@
 > ✅ **Phase 4 收尾（2026-09-03）**：证据按会话持久化、进程重启后继续拦截（JSONL 追加写、崩溃容忍）；HMR 安全测试通过；npm 发布形态就绪。
 > ✅ **缺陷审查轮（2026-09-03，Stage 9）**：修复三个缺陷（补救预算跨回合不重置、root 注册卸载不清理导致解释/强制分叉、deny 规则省略 trigger 静默失效），各配回归测试钉死。
 > ✅ **Roadmap 规划完成（2026-09-03）**：Stage 10-16 详细技术实施方案定稿 → [roadmap.md](./roadmap.md)（数据结构、算法、Harness 集成点、测试策略、风险登记册、计划书条文映射）。各阶段开工前以该文档为技术基线。
+> ✅ **Phase 7 行为观察达成（2026-09-03，Stage 10）**：系统能说"I observed a recurring pattern"（跨会话聚合、确定性置信度）且绝不写入用户状态——集成测试含 `user-model.json` 不存在的文件级断言。验证基线升至 **53/53 测试**。
 
 ## 后续阶段（按计划书继续）
 
@@ -65,6 +67,7 @@
 | 2026-09-03 | d9584bf | fix: per-turn budget, root cleanup, strict deny trigger — Stage 9 |
 | 2026-09-03 | 7a6a464 | docs: stage-9 review report + architecture §9 — Stage 9 |
 | 2026-09-03 | （本次） | docs: roadmap for stages 10-16 — 技术规划 |
+| 2026-09-03 | （本次） | feat: behavior observation engine — Stage 10 |
 
 ## 剩余工作（下一轮入口）
 
