@@ -21,7 +21,8 @@
     "demo": "tsx examples/demo.ts",
     "project": "tsx src/project/cli.ts",
     "build": "tsdown",
-    "bench": "tsx bench/run.ts"
+    "bench": "tsx bench/run.ts",
+    "ui": "tsx src/ui/server.ts"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

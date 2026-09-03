@@ -1,0 +1,94 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel2: #1d212b;
+  --text: #e6e9ef;
+  --muted: #8a93a6;
+  --accent: #4da3ff;
+  --ok: #3ecf8e;
+  --warn: #ffb454;
+  --bad: #ff6b6b;
+  --border: #2a3040;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+header {
+  display: flex; align-items: baseline; gap: 16px;
+  padding: 16px 24px 8px;
+}
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 16px; margin: 18px 0 10px; }
+h3 { font-size: 14px; margin: 20px 0 8px; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+code, .pre { font-family: Consolas, monospace; font-size: 12px; }
+
+#tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+#tabs button {
+  background: none; border: none; color: var(--muted);
+  padding: 10px 14px; cursor: pointer; font-size: 14px;
+  border-bottom: 2px solid transparent;
+}
+#tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+
+main { padding: 12px 24px 48px; max-width: 1100px; }
+.tab { display: none; }
+.tab.active { display: block; }
+
+.cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 18px; min-width: 140px;
+}
+.card .num { font-size: 26px; font-weight: 700; color: var(--accent); }
+.card .label { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; background: var(--panel2); }
+tr:last-child td { border-bottom: none; }
+
+button, select, input {
+  background: var(--panel2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 10px; font-size: 13px;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.danger:hover { border-color: var(--bad); color: var(--bad); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #0b1522; font-weight: 600; }
+input { min-width: 240px; }
+
+.form { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+.form .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+.form label { width: 110px; color: var(--muted); font-size: 13px; }
+.row { display: flex; align-items: center; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+
+.msg { font-size: 12px; margin-left: 8px; }
+.msg.ok { color: var(--ok); }
+.msg.bad { color: var(--bad); white-space: pre-wrap; }
+
+.candidate {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; margin: 10px 0;
+}
+.candidate .meta { color: var(--muted); font-size: 12px; margin: 6px 0; }
+.candidate .evidence { color: var(--muted); font-size: 12px; margin: 2px 0; }
+.candidate .draft { margin: 8px 0; padding: 8px 12px; background: var(--panel2); border-radius: 6px; font-size: 13px; }
+.candidate .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; margin-right: 6px; }
+.badge.high { background: rgba(62,207,142,.15); color: var(--ok); }
+.badge.mid { background: rgba(255,180,84,.15); color: var(--warn); }
+
+.pre {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; white-space: pre-wrap; word-break: break-all; max-height: 420px; overflow: auto;
+}
+.tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: var(--panel2); border: 1px solid var(--border); color: var(--muted); }
+.tag.on { color: var(--ok); border-color: var(--ok); }
+.tag.off { color: var(--bad); border-color: var(--bad); }

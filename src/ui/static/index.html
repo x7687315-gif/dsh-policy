@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🧋 dsh-policy 管理台</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🧋 dsh-policy 管理台</h1>
+    <span id="conn" class="muted">连接中…</span>
+  </header>
+
+  <nav id="tabs">
+    <button data-tab="dashboard" class="active">仪表盘</button>
+    <button data-tab="rules">硬规则</button>
+    <button data-tab="candidates">待审候选</button>
+    <button data-tab="records">提醒与偏好</button>
+    <button data-tab="projects">项目生命周期</button>
+    <button data-tab="evidence">证据</button>
+  </nav>
+
+  <main>
+    <section id="tab-dashboard" class="tab active">
+      <h2>概览</h2>
+      <div id="overview" class="cards"></div>
+      <p class="muted">说明：插件在激活时读取策略与用户模型，此处的修改在插件下次重载 / 新会话时生效。所有写入均经过与 Review CLI 相同的授权与审计屏障。</p>
+    </section>
+
+    <section id="tab-rules" class="tab">
+      <h2>硬规则 <span class="muted" id="rules-paths"></span></h2>
+      <div class="row"><label>作用域</label>
+        <select id="rules-scope"><option value="project">项目</option><option value="global">全局</option></select>
+        <button id="rules-reload">刷新</button>
+      </div>
+      <table id="rules-table"><thead><tr><th>启用</th><th>ID</th><th>类型</th><th>内容</th><th>操作</th></tr></thead><tbody></tbody></table>
+      <h3>新增 / 编辑规则</h3>
+      <form id="rule-form" class="form">
+        <div class="row"><label>规则类型</label>
+          <select id="rule-kind">
+            <option value="tool_pass">验证型（改动后必须通过某工具）</option>
+            <option value="deny">禁止型（MUST NOT 调用某工具）</option>
+          </select>
+        </div>
+        <div class="row"><label>规则 ID</label><input id="rule-id" placeholder="例如 test-after-code-change" required /></div>
+        <div class="row" id="rule-require-row"><label>要求</label>
+          <select id="rule-require-builtin">
+            <option value="tests_pass">tests_pass（测试通过）</option>
+            <option value="typecheck_pass">typecheck_pass（类型检查通过）</option>
+            <option value="__custom">自定义工具…</option>
+          </select>
+          <input id="rule-require-tool" placeholder="工具名，例如 bench_lint" style="display:none" />
+          <input id="rule-require-pattern" placeholder="通过判定正则（可选，匹配工具真实输出）" style="display:none" />
+        </div>
+        <div class="row" id="rule-deny-row" style="display:none"><label>禁用工具</label><input id="rule-deny-tools" placeholder="逗号分隔，例如 drop_database, rm_rf" /></div>
+        <div class="row"><label>补救提示（可选）</label><input id="rule-remediation" placeholder="被阻止时注入给模型的指令" /></div>
+        <div class="row"><label>作用域</label>
+          <select id="rule-scope"><option value="project">项目</option><option value="global">全局</option></select>
+        </div>
+        <button type="submit">保存规则（写入并校验）</button>
+        <span id="rule-msg" class="msg"></span>
+      </form>
+    </section>
+
+    <section id="tab-candidates" class="tab">
+      <h2>待审候选 <span class="muted">观察引擎只提建议；确认才成为持久提醒，拒绝则永不复活</span></h2>
+      <div id="candidates"></div>
+    </section>
+
+    <section id="tab-records" class="tab">
+      <h2>提醒（Behavior Guard）</h2>
+      <table id="guards-table"><thead><tr><th>启用</th><th>ID</th><th>内容</th><th>来源</th><th>操作</th></tr></thead><tbody></tbody></table>
+      <h3>手动新增提醒</h3>
+      <form id="guard-form" class="form">
+        <div class="row"><label>提醒文案</label><input id="guard-message" placeholder="例如：改 API 后检查受影响的调用方" required /></div>
+        <button type="submit">新增（写入用户模型并审计）</button>
+        <span id="guard-msg" class="msg"></span>
+      </form>
+      <h2>偏好（Preference）</h2>
+      <table id="prefs-table"><thead><tr><th>启用</th><th>ID</th><th>内容</th><th>适用条件</th><th>优先级</th><th>操作</th></tr></thead><tbody></tbody></table>
+      <h3>新增偏好</h3>
+      <form id="pref-form" class="form">
+        <div class="row"><label>偏好内容</label><input id="pref-text" placeholder="例如：优先使用 async/await" required /></div>
+        <div class="row"><label>适用语言</label><input id="pref-language" placeholder="例如 typescript（可空）" /></div>
+        <div class="row"><label>文件 Glob</label><input id="pref-glob" placeholder="例如 src/**（可空，逗号分隔）" /></div>
+        <div class="row"><label>任务正则</label><input id="pref-regex" placeholder="例如 重构|refactor（可空）" /></div>
+        <div class="row"><label>优先级</label><input id="pref-priority" type="number" value="50" /></div>
+        <button type="submit">新增</button>
+        <span id="pref-msg" class="msg"></span>
+      </form>
+    </section>
+
+    <section id="tab-projects" class="tab">
+      <h2>项目生命周期</h2>
+      <p class="muted">未列出的项目视为 active。归档（含目录迁移）请使用 CLI：<code>pnpm project archive &lt;id&gt;</code></p>
+      <table id="projects-table"><thead><tr><th>项目</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section id="tab-evidence" class="tab">
+      <h2>证据（只读）</h2>
+      <p class="muted">每个会话一个 JSONL 文件；插件运行时的全部证据都来自真实工具结果。</p>
+      <div id="evidence-list"></div>
+      <pre id="evidence-view" class="pre"></pre>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

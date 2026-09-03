@@ -35,7 +35,7 @@ Subsystems behind that pipeline:
 | **Context Resolver** | Injects only task-relevant preferences/goals under a hard 800-token budget; hard rules are never evicted | prompt layers 920/925 |
 | **Project lifecycle** | Paused/completed/archived projects stop contributing rules | activation (registry) |
 
-Verification baseline: **145/145 tests** across 22 files, benchmarked end-to-end (see [docs/benchmarks.md](docs/benchmarks.md)).
+Verification baseline: **156/156 tests** across 23 files, benchmarked end-to-end (see [docs/benchmarks.md](docs/benchmarks.md)), plus a local **web management UI** (`pnpm ui`) for point-and-click management of everything below.
 
 ## Why
 
@@ -145,12 +145,31 @@ The full schema (tool-pass rules, deny rules, evidence matchers, scopes, remedia
 
 ```bash
 pnpm install
-pnpm test        # 145 tests / 22 files — real Harness stack, scripted LLM (no API key needed)
+pnpm test        # 156 tests / 23 files — real Harness stack, scripted LLM (no API key needed)
 pnpm bench       # full benchmark sweep -> bench/report.json (constraint/personalization/cost)
+pnpm ui          # local web management UI -> http://127.0.0.1:5178
 pnpm demo        # end-to-end: BLOCK -> remediation injected -> tests run -> PASS
 pnpm typecheck   # strict TS, zero errors
 pnpm build       # tsdown -> dist/ (npm-publishable bundle)
 ```
+
+### 🖥️ Web management UI — point-and-click management
+
+```bash
+pnpm ui --policy .dsh-policy/policy.json --candidates <behaviorRoot> --model ~/.dsh-policy/user-model.json
+# open http://127.0.0.1:5178  (localhost only)
+```
+
+Six tabs, no configuration file editing required:
+
+- **Dashboard** — counts of rules, pending candidates, active guards/preferences, projects, evidence sessions
+- **Hard rules** — add/edit/enable/disable tool-pass and MUST-NOT rules across project & global scopes; every save is server-side validated (invalid rules — including bad regexes — never reach disk)
+- **Candidates** — review observed patterns with evidence & confidence: confirm / edit the message / reject (tombstoned forever) / skip
+- **Guards & preferences** — manage durable user-model records with enable/disable/delete (all audited), add preferences with `appliesTo` conditions
+- **Project lifecycle** — pause/resume/complete projects
+- **Evidence** — read-only per-session JSONL viewer
+
+Write-path discipline holds in the UI: it is the second legitimate writer (after the Review CLI), every mutation is an explicit user action flowing through `ConfirmRequest{via:'review-ui'}` + audit; the plugin stays read-only and picks changes up at its next activation.
 
 ### 🧋 Review CLI — confirm or reject behavior candidates
 
@@ -216,6 +235,7 @@ Every step                           → the model sees the active rules in its 
 - [x] Stage 14 — scopes (global/project/task) + lifecycle registry & CLI
 - [x] Stage 15 — full composition: goal model, `cordis.yml`, scenarios A–E end-to-end
 - [x] Stage 16 — benchmarks: constraint effectiveness / personalization effectiveness / cost
+- [x] Stage 17 — web management UI (out-of-plan enhancement): point-and-click management of rules, candidates, guards, preferences, lifecycle
 
 Next: **hardening & deployment** — npm publish, cloud smoke test (DeepSeek key), registered engineering debts (see [docs/PROGRESS.md](docs/PROGRESS.md)).
 
@@ -254,6 +274,7 @@ Each stage below has a full report (what was done, how, and where the project st
 - [Stage 15 — 全量集成与端到端验收](docs/stages/stage-15-全量集成与端到端验收.md) — goal model, cordis.yml, scenarios A–E
 - [Stage 16 — 基准测试](docs/stages/stage-16-基准测试.md) — three-dimension benchmark + the P1 defect it caught
 - [Review round — 一致性/全局性/安全性审查](docs/stages/stage-review-一致性全局性安全性.md) — cross-cutting defect review
+- [Stage 17 — Web 管理界面](docs/stages/stage-17-Web管理界面.md) — out-of-plan enhancement: point-and-click management UI (planned extra)
 
 **Reference documents**
 
