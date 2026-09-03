@@ -1,0 +1,21 @@
+plugins:
+  # Real cloud LLM adapter (production deployment form). In tests we boot only
+  # the dsh-policy entry; this block documents the production wiring where the
+  # API key is supplied from the environment, never committed.
+  - name: '@deepseek-ai/dsh-llm-deepseek'
+    options:
+      apiKey: ${DEEPSEEK_API_KEY}
+      model: deepseek-chat
+      baseURL: https://api.deepseek.com
+  # dsh-policy: the single plugin entry combining every subsystem
+  # (policy / behavior / user-model guards / preferences / context resolver /
+  # goal model). Options mirror DshPolicyOptions.
+  - name: dsh-policy
+    options:
+      policyPath: tests/fixtures/combo-policy.json
+      userModelPath: tests/fixtures/combo-user-model.json
+      behavior:
+        enabled: true
+      context:
+        tokenBudget: 800
+      projectId: combo-demo

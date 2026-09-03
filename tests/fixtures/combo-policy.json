@@ -1,0 +1,13 @@
+{
+  "project": "combo-demo",
+  "policy": {
+    "hard": [
+      {
+        "id": "tests-must-pass",
+        "trigger": "code_change",
+        "require": "tests_pass",
+        "enforcement": "hard"
+      }
+    ]
+  }
+}

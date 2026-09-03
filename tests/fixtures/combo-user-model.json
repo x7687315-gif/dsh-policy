@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "id": "um-guard-1",
+      "kind": "behavior_pattern",
+      "value": {
+        "message": "改完代码后先跑测试再提交（来自你确认的行为模式）",
+        "trigger": { "always": true }
+      },
+      "scope": "user",
+      "enabled": true,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "provenance": { "candidateId": "candidate:remediation_repeated:tests-must-pass", "confirmedAt": 0, "confirmedBy": "user" }
+    },
+    {
+      "id": "um-pref-1",
+      "kind": "preference",
+      "value": {
+        "text": "提交信息用中文、按 feat:/fix:/docs: 前缀分类",
+        "kind": "workflow"
+      },
+      "scope": "user",
+      "enabled": true,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "provenance": { "candidateId": "candidate:user_correction:commit-style", "confirmedAt": 0, "confirmedBy": "user" }
+    }
+  ]
+}
