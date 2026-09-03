@@ -12,6 +12,7 @@ import {
   type BehaviorGuardRule,
 } from '../behavior/guard.ts'
 import { evaluatePolicy, type Violation } from '../engine/constraint-engine.ts'
+import { guardsFromUserModel, readUserModelGuardRules } from '../usermodel/guards.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
 import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
 import { resolvePolicies, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
@@ -74,6 +75,12 @@ export interface DshPolicyOptions {
    * these from the user model; until then they are provided inline.
    */
   guards?: BehaviorGuardRule[]
+  /**
+   * Read-only path to a durable user model file: enabled behavior-pattern
+   * records are projected into guards. The plugin NEVER writes here —
+   * mutation goes through the Stage-12 review flow only (plan §2.1).
+   */
+  userModelPath?: string
   debug?: boolean
 }
 
@@ -160,7 +167,11 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
 
   const store = new JsonlEvidenceStore(options.evidenceRoot)
   const behavior = createBehaviorRuntime(options.behavior)
-  const guards = liveGuards(options.guards ?? [])
+  // User-model guards join inline guards; the model file is read ONCE at
+  // activation (restart/HMR re-applies pick up changes — a durable read,
+  // matching the file's role as user-controlled durable state).
+  const userModelGuards = options.userModelPath !== undefined ? guardsFromUserModel(readUserModelGuardRules(options.userModelPath)) : []
+  const guards = liveGuards([...userModelGuards, ...(options.guards ?? [])])
   let lastTaskText = '' // latest user message — the taskRegex channel matches against it
   // Remediation budget is PER TURN (keyed by the turn-stopping payload's turn
   // number): one exhausting turn must not strip later turns of their

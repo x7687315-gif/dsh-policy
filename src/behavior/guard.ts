@@ -1,5 +1,3 @@
-import type { CandidateBehavior } from './types.ts'
-
 /**
  * Behavior Guard (plan §Phase 8): user-confirmed guidance that is CONTEXTUAL
  * and NEVER BLOCKING. Type-isolated from hard rules on purpose — a guard can
@@ -25,7 +23,10 @@ export interface BehaviorGuardRule {
   severity?: 'info' | 'warn'
   enabled?: boolean
   /** Where this guard came from (Stage 12: the confirmed candidate). */
-  provenance?: Pick<CandidateBehavior, 'id'> & { confirmedAt?: number }
+  provenance?: {
+    candidateId?: string
+    confirmedAt?: number
+  }
 }
 
 /** Enabled guards only. */
