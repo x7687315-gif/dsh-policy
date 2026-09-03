@@ -9,7 +9,7 @@
 - **仓库**：https://github.com/x7687315-gif/dsh-policy
 - **技术栈**：TypeScript 5 (ESM) / Node ≥ 20 / pnpm / vitest / DeepSeek Harness (`@deepseek-ai/dsh-*` 0.1.1-rc.2 锁定) / Cordis 4.0.2
 - **运行环境约束**：本地不做任何模型推理（测试使用 ScriptedAdapter，零 GPU 负载）；LLM 调用一律走 DeepSeek 云端 API。
-- **验证基线**：`pnpm test` 65/65 全绿（10 个测试文件）；`pnpm typecheck` 干净；`pnpm build` 产出 dist/index.mjs。
+- **验证基线**：`pnpm test` 69/69 全绿（11 个测试文件）；`pnpm typecheck` 干净；`pnpm build` 产出 dist/index.mjs。
 
 ## 阶段总表
 
@@ -39,6 +39,7 @@
 > ✅ **Phase 7 行为观察达成（2026-09-03，Stage 10）**：系统能说"I observed a recurring pattern"（跨会话聚合、确定性置信度）且绝不写入用户状态——集成测试含 `user-model.json` 不存在的文件级断言。验证基线升至 **53/53 测试**。
 > ✅ **Phase 8 Behavior Guard 达成（2026-09-03，Stage 11）**：非阻塞不变量双向钉死（guard 在场时硬规则照常强制 + guard 永不出现在违规中，类型隔离保证编译期不可能）。验证基线 **58/58 测试**。
 > ✅ **Phase 9/10 核心达成（2026-09-03，Stage 12）**：User Model 单一写路径（ConfirmRequest 结构性强制 §11.7）+ 全程审计 + Review 纯函数流水线 + 插件只读消费闭环。验证基线 **65/65 测试**。
+> ✅ **L1/L2 架构审计 + 安全加固（2026-09-03）**：审计证明 Behavior Guard / User Model / Preference 均无法绕过授权或获得硬层 BLOCK 权限（类型隔离 + 只读消费 + Preference 未实现）；在此结论上加固硬层自身——passPattern 校验期编译 fail-fast（R1）、回合闸门 fail-closed（R2）。验证基线升至 **69/69 测试（11 文件）**。详见 [stage-audit-L1L2](./stages/stage-audit-L1L2-架构安全审计.md) 与 [stage-fix-R1R2](./stages/stage-fix-R1R2-正则校验与失败闭合.md)。
 
 ## 后续阶段（按计划书继续）
 
@@ -73,6 +74,7 @@
 | 2026-09-03 | c18ae09 | feat: user model + review pipeline core — Stage 12 |
 | 2026-09-03 | b4e3865 | feat: interactive review CLI（交互/管道双模式）— Stage 12 收尾 |
 | 2026-09-03 | 64fb67a | fix: handled candidates never re-surface in later review runs |
+| 2026-09-03 | 732c9d3 | fix: validate passPattern at load (fail-fast) + fail-closed turn evaluation (R1+R2) |
 
 ## 剩余工作（下一轮入口）
 
