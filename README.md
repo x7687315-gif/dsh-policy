@@ -28,6 +28,8 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 
 ## Status
 
+**Stage 0–12 complete** (plan Phase 0–10). Verification baseline: `pnpm test` **65/65** across 10 files, `pnpm typecheck` clean.
+
 **Phase 2 exit criterion achieved (2026-09-03):** integration tests against the real Harness loop prove that the Agent cannot finish a task while violating a hard project rule — and that the remediation path (run the tests → pass) unlocks completion.
 
 - [x] Stage 0 — repository foundation
@@ -35,6 +37,16 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 - [x] Stage 2 — policy & constraint engine core
 - [x] Stage 3 — hard-constraint proof of concept (`code_change → tests_pass`)
 - [x] Stage 4 — documentation & wrap-up
+- [x] Stage 5 — generalized rule model + Constraint Monotonicity
+- [x] Stage 6 — MUST NOT gate (`tools/pre-execute` deny) + rule visibility in the prompt
+- [x] Stage 7 — CI (GitHub Actions) and docs sync
+- [x] Stage 8 — durable session evidence, HMR safety, publishable build
+- [x] Stage 9 — defect review (per-turn budget, root cleanup, strict deny trigger)
+- [x] Stage 10 — behavior observation engine (zero extra LLM calls)
+- [x] Stage 11 — Behavior Guard (contextual, never-blocking guidance)
+- [x] Stage 12 — User Model + 🧋 Review pipeline (single write path + audit)
+
+Next up: **Stage 13 — preference layer & Context Resolver**.
 
 See [docs/PROGRESS.md](docs/PROGRESS.md) for the stage plan and next steps, [docs/architecture.md](docs/architecture.md) for the verified Harness extension seams.
 
@@ -42,7 +54,7 @@ See [docs/PROGRESS.md](docs/PROGRESS.md) for the stage plan and next steps, [doc
 
 ```bash
 pnpm install
-pnpm test   # 18 tests — incl. the four POC cases A/B/C/D on the real Harness stack
+pnpm test   # 65 tests (10 files) — incl. the four POC cases A/B/C/D on the real Harness stack
 pnpm demo   # end-to-end: BLOCK → remediation injected → tests run → PASS
 ```
 
