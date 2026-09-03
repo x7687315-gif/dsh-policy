@@ -48,12 +48,12 @@
 
 > **详细技术方案（数据结构 / 算法 / 集成点 / 测试策略 / 风险）见 [roadmap.md](./roadmap.md)。**
 
-| 阶段 | 目标 | 对应计划书 |
-|---|---|---|
-| Stage 13 | 偏好层 / Context Resolver（按任务解析相关上下文） | Phase 11-12 | ✅ 完成 | 2026-09-03 | [stage-13](./stages/stage-13-偏好层与ContextResolver.md) | 421937e, 93b7540, 2c1ac56, 88bc938, daf39f1 |
-| Stage 14 | 作用域完整实现（global 来源与 task scope）与项目生命周期 | Phase 13-14 | ✅ 完成 | 2026-09-03 | [stage-14](./stages/stage-14-作用域与生命周期.md) | b96d721, 09fc271, b035056 |
-| Stage 15 | 全量 Harness 集成与端到端验收（场景 A-E） | ✅ 完成 | 2026-09-03 | [stage-15](./stages/stage-15-全量集成与端到端验收.md) | 398e3c2, ee67dea, ea64ce6 |
-| Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 |
+| 阶段 | 目标 | 对应计划书 | 状态 | 报告 / 关键 commit |
+|---|---|---|---|---|
+| Stage 13 | 偏好层 / Context Resolver（按任务解析相关上下文） | Phase 11-12 | ✅ 完成 | [stage-13](./stages/stage-13-偏好层与ContextResolver.md) / 421937e, 93b7540, 2c1ac56, 88bc938, daf39f1 |
+| Stage 14 | 作用域完整实现（global 来源与 task scope）与项目生命周期 | Phase 13-14 | ✅ 完成 | [stage-14](./stages/stage-14-作用域与生命周期.md) / b96d721, 09fc271, b035056 |
+| Stage 15 | 全量 Harness 集成与端到端验收（场景 A-E） | Phase 16-17 | ✅ 完成 | [stage-15](./stages/stage-15-全量集成与端到端验收.md) / 398e3c2, ee67dea, ea64ce6, 160d3de |
+| Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 | ⬜ 未开始 | roadmap §9 |
 
 ## 提交记录
 
@@ -86,6 +86,16 @@
 | 2026-09-03 | b96d721 | feat: 作用域完整实现 global/project/task + 单调性校验期拒绝 — Stage 14 |
 | 2026-09-03 | 09fc271 | feat: 项目生命周期 registry 与 dsh-project CLI — Stage 14 |
 | 2026-09-03 | b035056 | test: 作用域单调性 + 生命周期 + 三层合并集成测试 — Stage 14 |
+| 2026-09-03 | ae2a0f9 | docs: stage-14 报告 + PROGRESS 更新 — Stage 14 |
+| 2026-09-03 | 398e3c2 | feat: 目标模型 GoalNode 与 Context Resolver 一行注入（§7.3）— Stage 15 |
+| 2026-09-03 | ee67dea | feat: cordis.yml 生产配置 + 无依赖配置解析器（§8.1 组合测试）— Stage 15 |
+| 2026-09-03 | ea64ce6 | test: 目标模型/配置解析/Loader 组合/Scenario A-E 端到端 — Stage 15 |
+| 2026-09-03 | 160d3de | docs: stage-15 报告 + PROGRESS 更新 — Stage 15 |
+| 2026-09-03 | （本次） | docs: sync README/PROGRESS/architecture to Stage 15 baseline — 文档一致性 |
+| 2026-09-03 | （本次） | fix: readGoals robustness, key-order monotonicity, archive sanitization — 审查轮（138 测试） |
+
+> 注：审计与加固提交（36609ca、732c9d3、b118e14）位于 Stage 13-15 之前，已在里程碑区引用。
+> 另：`64fb67a`（API 重建的 handled-candidates 修复）与本地的 `071e467` 为同一补丁，历史上以其为准。
 
 ## 剩余工作（下一轮入口）
 

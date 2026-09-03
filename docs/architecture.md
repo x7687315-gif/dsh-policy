@@ -72,3 +72,41 @@ turn/start → [preStep: agent/pre-step waterfall (reject|enter)] → step … s
   `ctx.effect(() => { dispose() })` 不匹配任何重载（Effect 类型要求闭包返回 `Disposable`）。这样插件 dispose 时 root 上的注册一并注销——否则换策略重挂载后，模型看到的仍是旧规则文本（解释与强制分叉）。
 - 教训（已写入回归测试）：跨 fiber 的效果注册必须回答"谁在何时注销它"；没有答案的注册就是泄漏。
 - 补救预算的正确键控：turn-stopping payload 携带 `turn` 回合号；任何"每回合重置"的计数都必须以它为键，而不是挂在 agent 对象上只增不减。
+
+## 10. Stage 13-15 补充核实：分层通道与组合形态
+
+### 10.1 Prompt 分层通道（物理排序 = 层级优先级）
+
+全部经 `ctx.root.systemPrompt.context()` 注册 + `ctx.effect(() => dispose)` 清理（§8/§9 模式）：
+
+| order | name | 内容 | 求值方式 |
+|---|---|---|---|
+| 900 | `dsh-policy` | 硬规则摘要（`summarizeRules`，已上移至 `policy/resolver.ts` 供 resolver 复用） | 静态 |
+| 910 | `dsh-policy/guards` | always + taskRegex 命中的引导 | 动态（每次组装对 `lastTaskText` 求值） |
+| 920 | `dsh-policy/preferences` | Context Resolver 产出的偏好段（相关性匹配 + token 预算 800 + 淘汰） | 动态（对任务画像求值） |
+| 925 | `dsh-policy/goal` | 链接目标一行（无链接即空串，零注入） | 动态 |
+
+硬规则摘要现居 `policy/resolver.ts`（非插件入口）——这是为打破 `context → plugin` 分层环的关键移动，`summarizeRules` 是 resolver 与 900 通道的单一事实来源。
+
+### 10.2 时序事实（两处实测）
+
+- `user/message` 会话事件在 preStep 组装**之后**追加 ⇒ taskRegex 类通道（guards 910、preferences 920）从**下一次组装**起生效；测试用两轮 turn + 请求级断言验证。
+- 插件激活时 `userModelPath` 只读加载一次（guard + preference 同模式）；变更经 Review CLI 走 User Model 单一写路径，重启/重挂载后生效。
+
+### 10.3 作用域与生命周期（Stage 14）
+
+- 三层作用域 global(0) < project(1) < task(2)，`SCOPE_RANK` 单一事实来源（`policy/schema.ts`）。
+- **双机制单调性**：`resolvePolicies`（解析期保留强者 + 注记）与 `validateScopeMonotonicity`（校验期 fail-fast 拒绝弱化声明，含 `enabled:false` 与改定义两类）互不耦合；插件在 resolve 前先校验，违反即拒绝启动。
+- 项目生命周期：插件只读 `project-registry.json`（`isActive`：未注册=active），`dsh-project` CLI 是唯一写者；非 active 项目用空文档兜底参与装配（规则零泄漏，global 仍生效）。
+- global 来源：`~/.dsh-policy/policy.json`（缺省不致命；存在但损坏 → 响亮 `PolicyLoadError`）。
+
+### 10.4 组合测试的等价 Loader（Stage 15，登记偏离）
+
+- `@cordisjs/loader` 沙箱未解包（安装成功但 `node_modules` 空目录），改用 `src/config/loader.ts` 无依赖 YAML 子集解析器读取**真实 `examples/cordis.yml`**（`${ENV}` 插值、嵌套 map、内联 flow list）启动真实 Harness 栈——官方"真实配置启动"诉求的离线安全等价实现。生产环境仍应使用官方 Loader。
+- 子集限制（登记债）：锚点、多行字符串、list-of-map 不支持；`cordis.yml` 引入 richer 语法时需扩展解析器。
+
+### 10.5 一致性纪律（后续阶段沿用）
+
+- 新增注入通道一律：`root.systemPrompt.context` + `ctx.effect(() => dispose)` + order 排在既有层之后（920/925 已按此办理）。
+- 软层（guard/preference/goal）永远：类型隔离不进 `HardRule`、只读消费、prompt 物理排序在 900 之后。
+- 900 摘要与 resolver bundle 共用同一渲染函数——"解释"与"resolver 产物"字节级一致，防止两处漂移。

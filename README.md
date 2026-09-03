@@ -28,7 +28,7 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 
 ## Status
 
-**Stage 0–12 complete** (plan Phase 0–10). Verification baseline: `pnpm test` **65/65** across 10 files, `pnpm typecheck` clean.
+**Stage 0–15 complete** (plan Phase 0–17). Verification baseline: `pnpm test` **134/134** across 21 files, `pnpm typecheck` clean, `pnpm build` green.
 
 **Phase 2 exit criterion achieved (2026-09-03):** integration tests against the real Harness loop prove that the Agent cannot finish a task while violating a hard project rule — and that the remediation path (run the tests → pass) unlocks completion.
 
@@ -44,9 +44,14 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 - [x] Stage 9 — defect review (per-turn budget, root cleanup, strict deny trigger)
 - [x] Stage 10 — behavior observation engine (zero extra LLM calls)
 - [x] Stage 11 — Behavior Guard (contextual, never-blocking guidance)
-- [x] Stage 12 — User Model + 🧋 Review pipeline (single write path + audit)
+- [x] Stage 12 — User Model + 🧋 Review pipeline & CLI (single write path + audit)
+- [x] Audit — L1/L2 security audit: soft layers cannot gain BLOCK or bypass authorization
+- [x] Hardening — R1 regex fail-fast + R2 fail-closed turn gate
+- [x] Stage 13 — preference layer & Context Resolver (token budget, relevance, order 920)
+- [x] Stage 14 — scopes (global/project/task) + lifecycle registry & CLI
+- [x] Stage 15 — full composition: goal model, `cordis.yml`, scenarios A–E end-to-end
 
-Next up: **Stage 13 — preference layer & Context Resolver**.
+Next up: **Stage 16 — benchmarks** (constraint effectiveness / personalization effectiveness / cost, plan Phase 18).
 
 See [docs/PROGRESS.md](docs/PROGRESS.md) for the stage plan and next steps, [docs/architecture.md](docs/architecture.md) for the verified Harness extension seams.
 
@@ -54,7 +59,7 @@ See [docs/PROGRESS.md](docs/PROGRESS.md) for the stage plan and next steps, [doc
 
 ```bash
 pnpm install
-pnpm test   # 65 tests (10 files) — incl. the four POC cases A/B/C/D on the real Harness stack
+pnpm test   # 134 tests (21 files) — incl. the four POC cases A/B/C/D and scenarios A–E on the real Harness stack
 pnpm demo   # end-to-end: BLOCK → remediation injected → tests run → PASS
 ```
 
