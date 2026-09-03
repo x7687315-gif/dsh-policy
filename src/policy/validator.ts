@@ -6,7 +6,7 @@ export type PolicyValidation =
 
 const TRIGGERS = new Set(['code_change'])
 const DENY_TRIGGERS = new Set(['always'])
-const SCOPES = new Set(['global', 'project'])
+const SCOPES = new Set(['global', 'project', 'task'])
 
 /**
  * Structural validation for a policy document read from disk or received

@@ -17,10 +17,11 @@ import { preferencesFromUserModel, readUserModelPreferenceRules, type ResolvedPr
 import { resolveContext } from '../context/resolver.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
 import type { EvidenceRecorder } from '../evidence/recorder.ts'
-import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
-import { resolvePolicies, summarizeRules, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
+import { loadGlobalPolicy, loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
+import { resolvePolicies, summarizeRules, validateScopeMonotonicity, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
 export { summarizeRules }
-import type { DenyToolsRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
+import type { DenyToolsRule, HardRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
+import { isActive, loadRegistry, projectRegistryPath, type ProjectRegistry } from '../project/registry.ts'
 import {
   DEFAULT_CODE_CHANGE_TOOLS,
   DEFAULT_VERIFICATION_TOOLS,
@@ -98,6 +99,31 @@ export interface DshPolicyOptions {
    * context bundle (default 800, roadmap §6.2).
    */
   context?: { tokenBudget?: number }
+  /**
+   * Global-scope hard rules (plan §Phase 13, roadmap §7.1). Optional; when
+   * omitted the plugin reads `~/.dsh-policy/policy.json` if present. Global
+   * rules apply across all projects and sit BELOW project/task rules in the
+   * monotonicity order.
+   */
+  globalPolicy?: PolicyDocument
+  /** Override the global policy file location (default `~/.dsh-policy/policy.json`). */
+  globalPolicyPath?: string
+  /**
+   * Task-scope hard rules (plan §Phase 13, roadmap §7.1): additive-only rules
+   * for the current task. A task rule may only ADD requirements — the
+   * monotonicity validator rejects any task rule that would weaken a
+   * project/global rule (e.g. `enabled: false` same-name override).
+   */
+  taskRules?: HardRule[]
+  /**
+   * Project lifecycle (plan §Phase 14): the current project id. When set, the
+   * plugin reads `project-registry.json` and excludes the project's rules from
+   * resolution unless the project is `active` (paused/completed/archived rules
+   * do not leak into the session).
+   */
+  projectId?: string
+  /** Override the project-registry file location (default `~/.dsh-policy/project-registry.json`). */
+  projectRegistryPath?: string
 }
 
 /** Session identity of an agent; evidence is correlated per session (plan §Phase 4). */
@@ -159,22 +185,70 @@ function remediationMessage(violations: readonly Violation[]): UserMessage {
  *   the runtime enforces them independently (plan §11.3).
  */
 export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
-  const document: PolicyDocument = options.policy
-    ?? loadPolicyFile(options.policyPath ?? resolvePolicyPath())
+  // --- Scope assembly (plan §Phase 13 + §Phase 14) --------------------------
+  // Build the merged policy from three sources, weakest-to-strongest in the
+  // monotonicity order global < project < task:
+  //   1. global  — `~/.dsh-policy/policy.json` (or inline/path override),
+  //                optional, applies across every project.
+  //   2. project — the runtime's primary policy, EXCLUDED from resolution when
+  //                the project is not `active` in the lifecycle registry.
+  //   3. task    — additive-only rules for the current task.
+  // A project's rules MUST NOT leak into unrelated work once it is
+  // paused/completed/archived (roadmap §7.2).
+  let registry: ProjectRegistry | undefined
+  let projectActive = true
+  if (options.projectId !== undefined) {
+    registry = loadRegistry(options.projectRegistryPath ?? projectRegistryPath())
+    projectActive = isActive(registry, options.projectId)
+  }
 
-  const resolution = resolvePolicies([
-    { scope: options.scope ?? document.scope ?? 'project', document },
-  ])
+  const projectDocument: PolicyDocument = projectActive
+    ? (options.policy ?? loadPolicyFile(options.policyPath ?? resolvePolicyPath()))
+    // Inactive project: fall back to an empty document so downstream evidence
+    // config uses defaults and no rule text leaks into the resolution.
+    : { project: options.projectId ?? 'inactive-project', scope: 'project', policy: { hard: [] } }
+
+  const scopedPolicies: ScopedPolicy[] = [
+    { scope: options.scope ?? projectDocument.scope ?? 'project', document: projectDocument },
+  ]
+
+  // Global rules apply universally — even for an inactive project, global still
+  // governs (strongest scope, never weakened by a paused project).
+  let globalDocument: PolicyDocument | undefined
+  if (options.globalPolicy !== undefined) globalDocument = options.globalPolicy
+  else if (options.globalPolicyPath !== undefined) globalDocument = loadPolicyFile(options.globalPolicyPath)
+  else globalDocument = loadGlobalPolicy()
+  if (globalDocument !== undefined) {
+    scopedPolicies.push({ scope: 'global', document: globalDocument })
+  }
+
+  // Task rules: additive-only; the monotonicity validator rejects any task rule
+  // that would weaken a project/global rule.
+  if (options.taskRules !== undefined && options.taskRules.length > 0) {
+    scopedPolicies.push({
+      scope: 'task',
+      document: { project: `task:${options.projectId ?? 'adhoc'}`, scope: 'task', policy: { hard: options.taskRules } },
+    })
+  }
+
+  // Fail-fast: reject any scope that attempts to weaken a stronger-scope rule
+  // (e.g. a task rule trying to `enabled: false` a global hard rule).
+  const monotonicity = validateScopeMonotonicity(scopedPolicies)
+  if (!monotonicity.ok) {
+    throw new Error(`dsh-policy: constraint monotonicity violated — ${monotonicity.errors.join('; ')}`)
+  }
+
+  const resolution = resolvePolicies(scopedPolicies)
   if (resolution.conflicts.length > 0) {
     throw new Error(`dsh-policy: conflicting rule ids in policy: ${[...new Set(resolution.conflicts)].join(', ')}`)
   }
 
   // Evidence matchers: document config > built-in defaults; rule-level
   // explicit passPattern wins over everything.
-  const codeChangeTools = new Set(document.evidence?.codeChangeTools ?? DEFAULT_CODE_CHANGE_TOOLS)
+  const codeChangeTools = new Set(projectDocument.evidence?.codeChangeTools ?? DEFAULT_CODE_CHANGE_TOOLS)
   const patterns = new Map<string, string>()
   for (const entry of DEFAULT_VERIFICATION_TOOLS) patterns.set(entry.tool, entry.passPattern)
-  for (const entry of document.evidence?.verificationTools ?? []) {
+  for (const entry of projectDocument.evidence?.verificationTools ?? []) {
     if (entry.passPattern !== undefined) patterns.set(entry.tool, entry.passPattern)
   }
   for (const rule of resolution.rules) {
@@ -188,7 +262,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   for (const rule of resolution.rules) {
     if (rule.trigger === 'code_change') watchTools.add(requireTool(rule as ToolPassRule))
   }
-  for (const entry of document.evidence?.verificationTools ?? []) watchTools.add(entry.tool)
+  for (const entry of projectDocument.evidence?.verificationTools ?? []) watchTools.add(entry.tool)
 
   // MUST NOT rules → tool name → rule id. Membership by shape ('denyTools' in
   // rule), not by trigger spelling, so a deny rule is never silently skipped.

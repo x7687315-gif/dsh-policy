@@ -11,7 +11,10 @@
  * Constraint Monotonicity (plan §2.5): specific scopes may ADD hard rules,
  * never silently weaken stronger ones.
  */
-export type RuleScope = 'global' | 'project'
+export type RuleScope = 'global' | 'project' | 'task'
+
+/** Scope strength for monotonicity: lower rank = stronger, wins on conflict. */
+export const SCOPE_RANK: Record<RuleScope, number> = { global: 0, project: 1, task: 2 }
 
 /** Built-in requirement names mapped to their default verification tool. */
 export const DEFAULT_REQUIRE_TOOL: Record<string, string> = {
