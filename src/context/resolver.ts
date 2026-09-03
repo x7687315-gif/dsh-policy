@@ -4,6 +4,7 @@ import { summarizeRules } from '../policy/resolver.ts'
 import type { BehaviorGuardRule } from '../behavior/guard.ts'
 import { alwaysGuards, guardContextText, taskGuardsFor } from '../behavior/guard.ts'
 import type { ResolvedPreference } from '../usermodel/preferences.ts'
+import type { GoalNode } from '../goal/types.ts'
 
 /**
  * Context Resolver (plan §Phase 11-12, roadmap §6.2) — the project's
@@ -37,6 +38,15 @@ export interface ResolveContextInput {
   preferences: ResolvedPreference[]
   /** Token budget ceiling (default 800, roadmap §6.2). */
   tokenBudget?: number
+  /**
+   * Goal model (plan §Phase 15, roadmap §7.3): the read-only goal projection.
+   * The resolver injects AT MOST ONE line of goal context — and only when the
+   * current task explicitly links to a goal (see `linkedGoalIds`). No
+   * auto-planning, no decomposition: the system only surfaces the link.
+   */
+  goals?: GoalNode[]
+  /** Goal ids the current task explicitly links to. Empty/absent → no injection. */
+  linkedGoalIds?: string[]
 }
 
 export interface ContextSection {
@@ -61,11 +71,12 @@ const EXT_TO_LANG: Record<string, string> = {
 const DEFAULT_BUDGET = 800
 const TOKEN_MARGIN = 1.15
 
-const LAYER_ORDER = { hard: 900, guard: 910, preference: 920 } as const
-const LAYER_HEADER: Record<'hard' | 'guard' | 'preference', string> = {
+const LAYER_ORDER = { hard: 900, guard: 910, preference: 920, goal: 925 } as const
+const LAYER_HEADER: Record<'hard' | 'guard' | 'preference' | 'goal', string> = {
   hard: '[dsh-policy] Active hard project rules (runtime-enforced, not optional):',
   guard: '[dsh-policy] Behavior guidance (non-binding, from your confirmed preferences):',
   preference: '[dsh-policy] Preferences (your confirmed, non-binding soft guidance):',
+  goal: '[dsh-policy] Linked goal (task-explicit context only, no planning):',
 }
 
 interface BundleItem {
@@ -137,6 +148,23 @@ export function matchPreference(p: ResolvedPreference, task: TaskProfile): boole
   return false
 }
 
+/**
+ * Goal context (plan §Phase 15, roadmap §7.3). Returns AT MOST ONE line, and
+ * ONLY when the current task explicitly links to a goal. Missing goals,
+ * empty link list, or no matching goal all yield the empty string — the
+ * resolver then injects nothing. No auto-planning, no decomposition.
+ */
+export function goalContextText(
+  goals: readonly GoalNode[] | undefined,
+  linkedGoalIds: readonly string[] | undefined,
+): string {
+  if (goals === undefined || linkedGoalIds === undefined || linkedGoalIds.length === 0) return ''
+  const linked = goals.filter(g => linkedGoalIds.includes(g.id))
+  if (linked.length === 0) return ''
+  const titles = linked.map(g => g.title).join('；')
+  return `${LAYER_HEADER.goal} ${titles}`
+}
+
 function renderLayer(layer: 'hard' | 'guard' | 'preference', items: BundleItem[]): string {
   if (items.length === 0) return ''
   return [LAYER_HEADER[layer], ...items.map(item => `- ${item.text}`)].join('\n')
@@ -200,6 +228,13 @@ export function resolveContext(input: ResolveContextInput): ContextBundle {
   if (guard) sections.push({ name: 'dsh-policy/guards', text: guard.text, order: LAYER_ORDER.guard })
   if (prefs.length > 0) {
     sections.push({ name: 'dsh-policy/preferences', text: renderLayer('preference', prefs), order: LAYER_ORDER.preference })
+  }
+  // Goal context: one line, only when the task explicitly links to a goal
+  // (roadmap §7.3). Kept out of the eviction logic — it is the whole point of
+  // the feature and is present only on explicit linkage.
+  const goalText = goalContextText(input.goals, input.linkedGoalIds)
+  if (goalText.length > 0) {
+    sections.push({ name: 'dsh-policy/goal', text: goalText, order: LAYER_ORDER.goal })
   }
   if (omitted > 0) {
     const last = sections[sections.length - 1]

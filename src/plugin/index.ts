@@ -14,7 +14,7 @@ import {
 import { evaluatePolicy, type Evaluation, type Violation } from '../engine/constraint-engine.ts'
 import { guardsFromUserModel, readUserModelGuardRules } from '../usermodel/guards.ts'
 import { preferencesFromUserModel, readUserModelPreferenceRules, type ResolvedPreference } from '../usermodel/preferences.ts'
-import { resolveContext } from '../context/resolver.ts'
+import { resolveContext, goalContextText } from '../context/resolver.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
 import type { EvidenceRecorder } from '../evidence/recorder.ts'
 import { loadGlobalPolicy, loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
@@ -22,6 +22,7 @@ import { resolvePolicies, summarizeRules, validateScopeMonotonicity, type Resolu
 export { summarizeRules }
 import type { DenyToolsRule, HardRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
 import { isActive, loadRegistry, projectRegistryPath, type ProjectRegistry } from '../project/registry.ts'
+import { readGoals, defaultGoalPath } from '../goal/store.ts'
 import {
   DEFAULT_CODE_CHANGE_TOOLS,
   DEFAULT_VERIFICATION_TOOLS,
@@ -124,6 +125,19 @@ export interface DshPolicyOptions {
   projectId?: string
   /** Override the project-registry file location (default `~/.dsh-policy/project-registry.json`). */
   projectRegistryPath?: string
+  /**
+   * Goal model (plan §Phase 15, roadmap §7.3): the read-only goal projection.
+   * Inline goals take precedence over `goalPath`. The plugin NEVER writes
+   * goals — it only surfaces a linked goal as one line of context.
+   */
+  goals?: import('../goal/types.ts').GoalNode[]
+  /** Load goals from this file (default `~/.dsh-policy/goals.json`). */
+  goalPath?: string
+  /**
+   * Goal ids the CURRENT task explicitly links to. Empty/absent → no goal
+   * context is injected (the system does no auto-planning or decomposition).
+   */
+  taskGoalIds?: string[]
 }
 
 /** Session identity of an agent; evidence is correlated per session (plan §Phase 4). */
@@ -282,6 +296,10 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
     ? preferencesFromUserModel(readUserModelPreferenceRules(options.userModelPath))
     : []
   const preferences = [...userModelPrefs, ...(options.preferences ?? [])]
+  // Goal model (roadmap §7.3): read-only projection, the plugin never writes.
+  // Inline `goals` wins over `goalPath`; the task links via `taskGoalIds`.
+  const goals = options.goals
+    ?? (options.goalPath !== undefined ? readGoals(options.goalPath) : readGoals(defaultGoalPath()))
   let lastTaskText = '' // latest user message — the taskRegex channel matches against it
   let recentFiles: string[] = [] // task-profile tracking for preference relevance (language/glob)
   let recentTools: string[] = [] // recent tool names, for potential future tool-based relevance
@@ -496,6 +514,16 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
       },
     })
     if (disposePrefs !== undefined) ctx.effect(() => disposePrefs)
+    // Goal context (roadmap §7.3): one line, only when the task explicitly
+    // links to a goal. Re-evaluated per assembly so a re-applied plugin with a
+    // different task linkage re-surfaces the right line. Shares the resolver's
+    // `goalContextText` so the bundle and the live injection stay identical.
+    const disposeGoal = root.systemPrompt?.context({
+      name: 'dsh-policy/goal',
+      order: 925,
+      text: () => goalContextText(goals, options.taskGoalIds),
+    })
+    if (disposeGoal !== undefined) ctx.effect(() => disposeGoal)
   } catch (error) {
     log(`system-prompt context registration skipped: ${error instanceof Error ? error.message : String(error)}`)
   }
