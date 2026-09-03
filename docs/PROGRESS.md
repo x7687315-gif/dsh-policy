@@ -27,7 +27,7 @@
 | Stage 9 | 全量缺陷审查与修复：补救预算按回合重置、root 注册卸载清理、deny trigger 收紧（+3 回归测试） | ✅ 完成 | 2026-09-03 | [stage-9](./stages/stage-9-缺陷审查与修复.md) | d9584bf |
 | Stage 10 | 行为观察引擎：4 类信号、确定性置信度、签名去重、拒绝墓碑、JSONL+原子投影、opt-in（Phase 7 ✅） | ✅ 完成 | 2026-09-03 | [stage-10](./stages/stage-10-行为观察引擎.md) | 3e7d514 |
 | Stage 11 | Behavior Guard：双注入通道（prompt 910 + post-execute 附加上下文）、类型隔离非阻塞不变量（Phase 8 ✅） | ✅ 完成 | 2026-09-03 | [stage-11](./stages/stage-11-BehaviorGuard.md) | fd62288 |
-| Stage 12（核心） | User Model 单一写路径 + 审计、Review 纯函数流水线、插件只读消费闭环（Phase 9/10 核心 ✅，CLI 壳待续） | ✅ 完成 | 2026-09-03 | [stage-12](./stages/stage-12-UserModel与Review.md) | 见提交记录 |
+| Stage 12 | User Model 单一写路径 + 审计、Review 流水线与 🧋 CLI（交互/管道双模式）、插件只读消费闭环（Phase 9/10 ✅，DSH UI 命令留 Stage 15） | ✅ 完成 | 2026-09-03 | [stage-12](./stages/stage-12-UserModel与Review.md) | 见提交记录 |
 
 ## 里程碑状态
 

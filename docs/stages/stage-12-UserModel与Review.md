@@ -3,7 +3,7 @@
 - **日期**：2026-09-03
 - **对应计划书**：Phase 9（User Model）+ Phase 10（Daily Review）核心
 - **技术基线**：[roadmap.md §5](../roadmap.md)
-- **状态**：✅ 核心完成（64/64 测试全绿，新增 6 条）；交互式 CLI 壳与 DSH UI 命令留待下一轮
+- **状态**：✅ 完成（64/64 测试全绿，新增 6 条 + CLI 冒烟验证）
 
 ## 做了什么
 
@@ -21,8 +21,14 @@ store 全操作 + 审计顺序断言 / 重启恢复 + 损坏响亮失败 / 未�
 ## 实现取舍（诚实记录）
 
 - 确认候选的 guard trigger 一律 `always: true`（签名里只有规则 id，无法可靠反推工具触发）——trigger 精修留给 CLI 编辑功能；
-- `ConfirmRequest` 不是安全边界，是**结构性强制**：让每个调用点必须声明用户授权（计划书 §11.7）；
-- 交互式 CLI（stdin 审查循环）与 DSH UI 命令（`@deepseek-ai/dsh-commands`）未实现——纯函数库已就绪，壳是薄封装，放下一轮。
+- `ConfirmRequest` 不是安全边界，是**结构性强制**：让每个调用点必须声明用户授权（计划书 §11.7）。
+
+## Review CLI（🧋，`src/review/cli.ts`）
+
+- **交互式**（TTY）：逐条展示候选（证据指针、次数/会话/置信度、草拟文案）→ `[y] 确认 / [e <msg>] 编辑 / [n] 拒绝 / [s] 跳过`；
+- **管道模式**（非 TTY）：预读全部输入行按序消费——可脚本化、可回放（本次冒烟即管道驱动：edit 一条 + reject 一条）；
+- 拒绝经行为运行时写墓碑并同步候选队列；确认经 `applyReview` 落 User Model（带溯源）。冒烟核对：编辑文案正确落盘、墓碑生效、候选队列清零。
+- DSH UI 命令集成（`@deepseek-ai/dsh-commands`）按 roadmap 留在 Stage 15。
 
 ## 退出标准对照（计划书 §Phase 9/10）
 
