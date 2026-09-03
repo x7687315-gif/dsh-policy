@@ -2,6 +2,15 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { createBehaviorRuntime, detectCorrection, type BehaviorOptions } from '../behavior/wire.ts'
 import { ruleSignature, toolDenySignature } from '../behavior/signature.ts'
+import {
+  alwaysGuards,
+  guardContextText,
+  guardReminderText,
+  liveGuards,
+  taskGuardsFor,
+  toolGuardsFor,
+  type BehaviorGuardRule,
+} from '../behavior/guard.ts'
 import { evaluatePolicy, type Violation } from '../engine/constraint-engine.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
 import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
@@ -59,6 +68,12 @@ export interface DshPolicyOptions {
    * `behavior.root` for the Stage-12 review flow — never in user state.
    */
   behavior?: BehaviorOptions
+  /**
+   * User-confirmed behavior guidance (plan §Phase 8). NON-BLOCKING by type
+   * isolation: guards never enter the constraint engine. Stage 12 loads
+   * these from the user model; until then they are provided inline.
+   */
+  guards?: BehaviorGuardRule[]
   debug?: boolean
 }
 
@@ -145,6 +160,8 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
 
   const store = new JsonlEvidenceStore(options.evidenceRoot)
   const behavior = createBehaviorRuntime(options.behavior)
+  const guards = liveGuards(options.guards ?? [])
+  let lastTaskText = '' // latest user message — the taskRegex channel matches against it
   // Remediation budget is PER TURN (keyed by the turn-stopping payload's turn
   // number): one exhausting turn must not strip later turns of their
   // remediation chances.
@@ -200,7 +217,27 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
         log(`tool_pass recorded via ${exec.name}: ${passed ? 'passed' : 'failed'}`)
       }
     }
-    return next()
+    // Behavior-guidance channel (non-blocking): attach a reminder to an
+    // accepted result. A guard can only ever ADD context — never deny,
+    // never block, never rewrite (type isolation keeps this one-way).
+    const decision = await next()
+    if (decision.kind === 'accept' && agent !== undefined) {
+      const guard = toolGuardsFor(guards, exec.name)[0]
+      if (guard !== undefined) {
+        log(`guard reminder attached for ${exec.name} (${guard.id})`)
+        return {
+          ...decision,
+          additionalContexts: [
+            ...(decision.additionalContexts ?? []),
+            createUserMessage({
+              content: [{ type: 'text', text: guardReminderText(guard) }],
+              source: { kind: 'plugin', plugin: 'dsh-policy' },
+            }),
+          ],
+        }
+      }
+    }
+    return decision
   })
 
   // Turn-boundary hard gate with remediation loop.
@@ -247,13 +284,15 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   // Low precision BY DESIGN — it can only ever produce a candidate for the
   // user to review, never durable state (plan §Phase 7 boundary).
   ctx.on('session/event', (session, event) => {
-    if (behavior === undefined || event.type !== 'user/message') return
+    if (event.type !== 'user/message') return
     const message = event.data as { source?: { kind?: string }; content?: { type: string; text?: string }[] }
     if (message.source?.kind !== 'user') return
     const text = (message.content ?? [])
       .filter(block => block.type === 'text')
       .map(block => block.text ?? '')
       .join(' ')
+    lastTaskText = text // taskRegex guard channel matches against the latest user message
+    if (behavior === undefined) return
     const signature = detectCorrection(text, options.behavior)
     if (signature === undefined) return
     behavior.note({
@@ -280,6 +319,15 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
       text: summarizeRules(resolution),
     })
     if (dispose !== undefined) ctx.effect(() => dispose)
+    // Guidance layer: order 910 renders AFTER hard rules (900) — physical
+    // prompt order mirrors the layer hierarchy. Dynamic text: re-evaluated
+    // per assembly against the latest task text.
+    const disposeGuards = root.systemPrompt?.context({
+      name: 'dsh-policy/guards',
+      order: 910,
+      text: () => guardContextText([...alwaysGuards(guards), ...taskGuardsFor(guards, lastTaskText)]),
+    })
+    if (disposeGuards !== undefined) ctx.effect(() => disposeGuards)
   } catch (error) {
     log(`system-prompt context registration skipped: ${error instanceof Error ? error.message : String(error)}`)
   }
