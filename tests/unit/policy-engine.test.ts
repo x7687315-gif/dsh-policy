@@ -232,6 +232,17 @@ describe('evidence recorder', () => {
     expect(recorder.hasPassingToolRunSince(200, 'typecheck')).toBe(true)
     expect(recorder.hasPassingToolRunSince(200, 'run_tests')).toBe(false)
   })
+
+  it('REGRESSION (Stage 16 benchmark): same-millisecond evidence stays causally ordered', () => {
+    // A code change and its passing test landing in the SAME millisecond must
+    // still satisfy the rule — the recorder stamps strictly increasing `at`.
+    const recorder = new EvidenceRecorder()
+    recorder.record({ kind: 'code_change', at: 1000, tool: 'edit_file', detail: '' })
+    recorder.record({ kind: 'tool_pass', at: 1000, tool: 'run_tests', passed: true, detail: '' })
+    const events = recorder.events()
+    expect(events[1]!.at).toBeGreaterThan(events[0]!.at)
+    expect(recorder.hasPassingToolRunSince(events[0]!.at, 'run_tests')).toBe(true)
+  })
 })
 
 describe('constraint engine (plan §Phase 2 cases + v1 multi-rule)', () => {
