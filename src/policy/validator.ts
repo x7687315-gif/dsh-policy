@@ -98,8 +98,12 @@ export function validatePolicyDocument(input: unknown): PolicyValidation {
       if (typeof req['tool'] !== 'string' || req['tool'].length === 0) {
         errors.push(`${where}.require.tool must be a non-empty string`)
       }
-      if (req['passPattern'] !== undefined && typeof req['passPattern'] !== 'string') {
-        errors.push(`${where}.require.passPattern must be a string when present`)
+      if (req['passPattern'] !== undefined) {
+        if (typeof req['passPattern'] !== 'string') {
+          errors.push(`${where}.require.passPattern must be a string when present`)
+        } else {
+          validateRegex(req['passPattern'], `${where}.require`, errors)
+        }
       }
     } else {
       errors.push(`${where}.require must be a built-in name or a { kind: "tool_pass", tool } object`)
@@ -108,6 +112,20 @@ export function validatePolicyDocument(input: unknown): PolicyValidation {
 
   if (errors.length > 0) return { ok: false, errors }
   return { ok: true, policy: input as PolicyDocument }
+}
+
+/**
+ * A pass pattern is fed straight into `new RegExp(pattern)` at enforcement
+ * time (plugin post-execute evidence match). A malformed pattern must be
+ * rejected HERE — at load — so it can never surface as a runtime crash or a
+ * silent false BLOCK. Fail fast, loudly, at validation.
+ */
+function validateRegex(pattern: string, where: string, errors: string[]): void {
+  try {
+    new RegExp(pattern)
+  } catch {
+    errors.push(`${where}.passPattern "${pattern}" is not a valid regular expression`)
+  }
 }
 
 function validateEvidence(evidence: unknown, errors: string[]): void {
@@ -131,6 +149,15 @@ function validateEvidence(evidence: unknown, errors: string[]): void {
       entries.forEach((entry: unknown, index: number) => {
         if (typeof entry !== 'object' || entry === null || typeof (entry as Record<string, unknown>)['tool'] !== 'string') {
           errors.push(`evidence.verificationTools[${index}] must be { tool: string, passPattern?: string }`)
+          return
+        }
+        const passPattern = (entry as Record<string, unknown>)['passPattern']
+        if (passPattern !== undefined) {
+          if (typeof passPattern !== 'string') {
+            errors.push(`evidence.verificationTools[${index}].passPattern must be a string`)
+          } else {
+            validateRegex(passPattern, `evidence.verificationTools[${index}]`, errors)
+          }
         }
       })
     }

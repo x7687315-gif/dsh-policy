@@ -88,6 +88,44 @@ describe('policy validator (v1)', () => {
     expect(validatePolicyDocument('nope').ok).toBe(false)
     expect(validatePolicyDocument(null).ok).toBe(false)
   })
+
+  it('rejects malformed passPatterns at validation time (fail-fast)', () => {
+    const badEvidence = validatePolicyDocument({
+      project: 'x',
+      evidence: { verificationTools: [{ tool: 'typecheck', passPattern: '(' }] },
+      policy: { hard: [{ id: 'a', trigger: 'code_change', require: 'tests_pass', enforcement: 'hard' }] },
+    })
+    expect(badEvidence.ok).toBe(false)
+    if (!badEvidence.ok) expect(badEvidence.errors.join('; ')).toContain('not a valid regular expression')
+
+    const badRequire = validatePolicyDocument({
+      project: 'x',
+      policy: {
+        hard: [{
+          id: 'a', trigger: 'code_change',
+          require: { kind: 'tool_pass', tool: 'typecheck', passPattern: '[' },
+          enforcement: 'hard',
+        }],
+      },
+    })
+    expect(badRequire.ok).toBe(false)
+    if (!badRequire.ok) expect(badRequire.errors.join('; ')).toContain('not a valid regular expression')
+  })
+
+  it('accepts well-formed passPatterns (including anchors and escapes)', () => {
+    const result = validatePolicyDocument({
+      project: 'x',
+      evidence: { verificationTools: [{ tool: 'typecheck', passPattern: '\\bNO ISSUES\\b' }] },
+      policy: {
+        hard: [{
+          id: 'a', trigger: 'code_change',
+          require: { kind: 'tool_pass', tool: 'typecheck', passPattern: '^0 (error|warning)s?$' },
+          enforcement: 'hard',
+        }],
+      },
+    })
+    expect(result.ok).toBe(true)
+  })
 })
 
 describe('policy loader', () => {

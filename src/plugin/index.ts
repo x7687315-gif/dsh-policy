@@ -11,9 +11,10 @@ import {
   toolGuardsFor,
   type BehaviorGuardRule,
 } from '../behavior/guard.ts'
-import { evaluatePolicy, type Violation } from '../engine/constraint-engine.ts'
+import { evaluatePolicy, type Evaluation, type Violation } from '../engine/constraint-engine.ts'
 import { guardsFromUserModel, readUserModelGuardRules } from '../usermodel/guards.ts'
 import { JsonlEvidenceStore } from '../evidence/store.ts'
+import type { EvidenceRecorder } from '../evidence/recorder.ts'
 import { loadPolicyFile, resolvePolicyPath } from '../policy/loader.ts'
 import { resolvePolicies, type Resolution, type ScopedPolicy } from '../policy/resolver.ts'
 import type { DenyToolsRule, PolicyDocument, RuleScope, ToolPassRule } from '../policy/schema.ts'
@@ -88,6 +89,27 @@ export interface DshPolicyOptions {
 function sessionIdOf(agent: unknown): string {
   const id = (agent as { session?: { id?: unknown } } | undefined)?.session?.id
   return typeof id === 'string' ? id : 'unknown-session'
+}
+
+/**
+ * Turn-boundary policy evaluation, **fail-closed**.
+ *
+ * The hard gate must never be lost to an internal exception: if the
+ * evaluation itself throws (corrupt evidence store, unexpected error), we
+ * refuse the turn — never silently complete it. A throwing evaluation is
+ * treated as an unresolved violation, not as a pass.
+ */
+export function evaluateTurn(resolution: Resolution, evidence: EvidenceRecorder): Evaluation {
+  try {
+    return evaluatePolicy(resolution, evidence)
+  } catch (error) {
+    throw new PolicyViolationError([{
+      ruleId: 'policy-evaluation',
+      requirement: 'hard project policy',
+      reason: `policy evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: 'Check the policy and evidence configuration; the turn was refused rather than silently completed.',
+    }])
+  }
 }
 
 export function summarizeRules(resolution: Resolution): string {
@@ -223,7 +245,19 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
         const text = typeof result.value === 'string'
           ? result.value
           : JSON.stringify(result.value ?? result.content)
-        const passed = pattern === undefined ? true : new RegExp(pattern).test(text)
+        // Defensive: a pattern reaching here should have been validated, but
+        // inline `options.policy` bypasses the loader. Never let a bad pattern
+        // crash evidence collection — on compile failure, record as not passed
+        // (fail-closed: the turn gate will then refuse, never silently pass).
+        let passed = true
+        if (pattern !== undefined) {
+          try {
+            passed = new RegExp(pattern).test(text)
+          } catch (error) {
+            log(`passPattern "${pattern}" failed to compile — recorded as not passed: ${error instanceof Error ? error.message : String(error)}`)
+            passed = false
+          }
+        }
         store.record(sessionId, { kind: 'tool_pass', at: Date.now(), tool: exec.name, passed, detail: text.slice(0, 200) })
         log(`tool_pass recorded via ${exec.name}: ${passed ? 'passed' : 'failed'}`)
       }
@@ -255,7 +289,7 @@ export function apply(ctx: Context, options: DshPolicyOptions = {}): void {
   ctx.on('agent/turn-stopping', (payload) => {
     const { agent, turn } = payload
     const sessionId = sessionIdOf(agent)
-    const evaluation = evaluatePolicy(resolution, store.recorderFor(sessionId))
+    const evaluation = evaluateTurn(resolution, store.recorderFor(sessionId))
     if (evaluation.status === 'PASS') return
 
     const budget = options.maxRemediations ?? 2
