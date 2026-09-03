@@ -9,7 +9,7 @@
 - **仓库**：https://github.com/x7687315-gif/dsh-policy
 - **技术栈**：TypeScript 5 (ESM) / Node ≥ 20 / pnpm / vitest / DeepSeek Harness (`@deepseek-ai/dsh-*` 0.1.1-rc.2 锁定) / Cordis 4.0.2
 - **运行环境约束**：本地不做任何模型推理（测试使用 ScriptedAdapter，零 GPU 负载）；LLM 调用一律走 DeepSeek 云端 API。
-- **验证基线**：`pnpm test` 69/69 全绿（11 个测试文件）；`pnpm typecheck` 干净；`pnpm build` 产出 dist/index.mjs。
+- **验证基线**：`pnpm test` 87/87 全绿（14 个测试文件）；`pnpm typecheck` 干净；`pnpm build` 产出 dist/index.mjs。
 
 ## 阶段总表
 
@@ -40,6 +40,7 @@
 > ✅ **Phase 8 Behavior Guard 达成（2026-09-03，Stage 11）**：非阻塞不变量双向钉死（guard 在场时硬规则照常强制 + guard 永不出现在违规中，类型隔离保证编译期不可能）。验证基线 **58/58 测试**。
 > ✅ **Phase 9/10 核心达成（2026-09-03，Stage 12）**：User Model 单一写路径（ConfirmRequest 结构性强制 §11.7）+ 全程审计 + Review 纯函数流水线 + 插件只读消费闭环。验证基线 **65/65 测试**。
 > ✅ **L1/L2 架构审计 + 安全加固（2026-09-03）**：审计证明 Behavior Guard / User Model / Preference 均无法绕过授权或获得硬层 BLOCK 权限（类型隔离 + 只读消费 + Preference 未实现）；在此结论上加固硬层自身——passPattern 校验期编译 fail-fast（R1）、回合闸门 fail-closed（R2）。验证基线升至 **69/69 测试（11 文件）**。详见 [stage-audit-L1L2](./stages/stage-audit-L1L2-架构安全审计.md) 与 [stage-fix-R1R2](./stages/stage-fix-R1R2-正则校验与失败闭合.md)。
+> ✅ **Phase 11/12 偏好层达成（2026-09-03，Stage 13）**：Context Resolver 纯函数（任务画像 + 三层级 → 最小上下文包）按 roadmap §6.2 落地；token 预算 800 + 层级→priority→recency 淘汰、硬规则永不淘汰；order 920 通道接线、偏好类型隔离不进约束引擎、复用 stage-12 单一写路径产出 preference 记录。验证基线升至 **87/87 测试（14 文件）**。详见 [stage-13](./stages/stage-13-偏好层与ContextResolver.md)。
 
 ## 后续阶段（按计划书继续）
 
@@ -47,7 +48,7 @@
 
 | 阶段 | 目标 | 对应计划书 |
 |---|---|---|
-| Stage 13 | 偏好层 / Context Resolver（按任务解析相关上下文） | Phase 11-12 |
+| Stage 13 | 偏好层 / Context Resolver（按任务解析相关上下文） | Phase 11-12 | ✅ 完成 | 2026-09-03 | [stage-13](./stages/stage-13-偏好层与ContextResolver.md) | 421937e, 93b7540, 2c1ac56, 88bc938, daf39f1 |
 | Stage 14 | 作用域完整实现（global 来源与 task scope）与项目生命周期 | Phase 13-14 |
 | Stage 15 | 全量 Harness 集成与端到端验收（场景 A-E） | Phase 16-17 |
 | Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 |
@@ -75,10 +76,14 @@
 | 2026-09-03 | b4e3865 | feat: interactive review CLI（交互/管道双模式）— Stage 12 收尾 |
 | 2026-09-03 | 64fb67a | fix: handled candidates never re-surface in later review runs |
 | 2026-09-03 | 732c9d3 | fix: validate passPattern at load (fail-fast) + fail-closed turn evaluation (R1+R2) |
+| 2026-09-03 | 421937e | feat: preference value schema + read-only projection — Stage 13 |
+| 2026-09-03 | 93b7540 | feat: context resolver (task profile + relevance + token budget) — Stage 13 |
+| 2026-09-03 | 2c1ac56 | feat: plugin wiring order 920 + task-profile tracking — Stage 13 |
+| 2026-09-03 | 88bc938 | feat: review pipeline emits preference records — Stage 13 |
+| 2026-09-03 | daf39f1 | test: relevance matrix + budget eviction + non-blocking invariant — Stage 13 |
 
 ## 剩余工作（下一轮入口）
 
-- Stage 13 偏好层与 Context Resolver（Phase 11-12，roadmap §6）：appliesTo 相关性匹配、token 预算硬上限与淘汰顺序；
 - guard taskRegex 通道的多会话隔离（AssembleContext 无会话标识，需 per-session 注入上下文——见 stage-12 报告已知限制）；
 - `test_fail_streak` 观察信号实现（需跨事件关联）；
 - global 作用域策略来源（用户级配置文件）与 task scope（Phase 13）；
