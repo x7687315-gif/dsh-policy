@@ -20,7 +20,8 @@
     "typecheck": "tsc --noEmit",
     "demo": "tsx examples/demo.ts",
     "project": "tsx src/project/cli.ts",
-    "build": "tsdown"
+    "build": "tsdown",
+    "bench": "tsx bench/run.ts"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

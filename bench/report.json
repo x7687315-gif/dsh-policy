@@ -1,0 +1,592 @@
+{
+  "meta": {
+    "timestamp": "2026-09-03T16:15:08.841Z",
+    "node": "24.20.0",
+    "platform": "win32",
+    "rules": [
+      1,
+      2,
+      4
+    ],
+    "noise": [
+      0,
+      3,
+      8
+    ],
+    "note": "latency values are environment-dependent; rates are deterministic and pinned by tests/integration/bench.test.ts"
+  },
+  "constraint": {
+    "cases": 36,
+    "detectionRate": 1,
+    "falseBlockRate": 0,
+    "falsePassRate": 0,
+    "completionCorrectness": 1,
+    "remediationSuccessRate": 1,
+    "perCase": [
+      {
+        "id": "compliant-r1-n0-0",
+        "rules": 1,
+        "noise": 0,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 3
+      },
+      {
+        "id": "violation-missing-r1-n0-1",
+        "rules": 1,
+        "noise": 0,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 2
+      },
+      {
+        "id": "violation-fail-r1-n0-2",
+        "rules": 1,
+        "noise": 0,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 3
+      },
+      {
+        "id": "no-change-r1-n0-3",
+        "rules": 1,
+        "noise": 0,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 1
+      },
+      {
+        "id": "compliant-r1-n3-4",
+        "rules": 1,
+        "noise": 3,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 6
+      },
+      {
+        "id": "violation-missing-r1-n3-5",
+        "rules": 1,
+        "noise": 3,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 5
+      },
+      {
+        "id": "violation-fail-r1-n3-6",
+        "rules": 1,
+        "noise": 3,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 6
+      },
+      {
+        "id": "no-change-r1-n3-7",
+        "rules": 1,
+        "noise": 3,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 4
+      },
+      {
+        "id": "compliant-r1-n8-8",
+        "rules": 1,
+        "noise": 8,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 11
+      },
+      {
+        "id": "violation-missing-r1-n8-9",
+        "rules": 1,
+        "noise": 8,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 10
+      },
+      {
+        "id": "violation-fail-r1-n8-10",
+        "rules": 1,
+        "noise": 8,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 11
+      },
+      {
+        "id": "no-change-r1-n8-11",
+        "rules": 1,
+        "noise": 8,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 9
+      },
+      {
+        "id": "compliant-r2-n0-12",
+        "rules": 2,
+        "noise": 0,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 4
+      },
+      {
+        "id": "violation-missing-r2-n0-13",
+        "rules": 2,
+        "noise": 0,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 2
+      },
+      {
+        "id": "violation-fail-r2-n0-14",
+        "rules": 2,
+        "noise": 0,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 4
+      },
+      {
+        "id": "no-change-r2-n0-15",
+        "rules": 2,
+        "noise": 0,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 1
+      },
+      {
+        "id": "compliant-r2-n3-16",
+        "rules": 2,
+        "noise": 3,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 7
+      },
+      {
+        "id": "violation-missing-r2-n3-17",
+        "rules": 2,
+        "noise": 3,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 5
+      },
+      {
+        "id": "violation-fail-r2-n3-18",
+        "rules": 2,
+        "noise": 3,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 7
+      },
+      {
+        "id": "no-change-r2-n3-19",
+        "rules": 2,
+        "noise": 3,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 4
+      },
+      {
+        "id": "compliant-r2-n8-20",
+        "rules": 2,
+        "noise": 8,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 12
+      },
+      {
+        "id": "violation-missing-r2-n8-21",
+        "rules": 2,
+        "noise": 8,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 10
+      },
+      {
+        "id": "violation-fail-r2-n8-22",
+        "rules": 2,
+        "noise": 8,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 12
+      },
+      {
+        "id": "no-change-r2-n8-23",
+        "rules": 2,
+        "noise": 8,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 9
+      },
+      {
+        "id": "compliant-r4-n0-24",
+        "rules": 4,
+        "noise": 0,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 6
+      },
+      {
+        "id": "violation-missing-r4-n0-25",
+        "rules": 4,
+        "noise": 0,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 2
+      },
+      {
+        "id": "violation-fail-r4-n0-26",
+        "rules": 4,
+        "noise": 0,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 6
+      },
+      {
+        "id": "no-change-r4-n0-27",
+        "rules": 4,
+        "noise": 0,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 1
+      },
+      {
+        "id": "compliant-r4-n3-28",
+        "rules": 4,
+        "noise": 3,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 9
+      },
+      {
+        "id": "violation-missing-r4-n3-29",
+        "rules": 4,
+        "noise": 3,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 5
+      },
+      {
+        "id": "violation-fail-r4-n3-30",
+        "rules": 4,
+        "noise": 3,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 9
+      },
+      {
+        "id": "no-change-r4-n3-31",
+        "rules": 4,
+        "noise": 3,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 4
+      },
+      {
+        "id": "compliant-r4-n8-32",
+        "rules": 4,
+        "noise": 8,
+        "kind": "compliant",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 14
+      },
+      {
+        "id": "violation-missing-r4-n8-33",
+        "rules": 4,
+        "noise": 8,
+        "kind": "violation-missing",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 10
+      },
+      {
+        "id": "violation-fail-r4-n8-34",
+        "rules": 4,
+        "noise": 8,
+        "kind": "violation-fail",
+        "expectedEnd": "error",
+        "actualEnd": "error",
+        "correct": true,
+        "requests": 14
+      },
+      {
+        "id": "no-change-r4-n8-35",
+        "rules": 4,
+        "noise": 8,
+        "kind": "no-change",
+        "expectedEnd": "completed",
+        "actualEnd": "completed",
+        "correct": true,
+        "requests": 9
+      }
+    ]
+  },
+  "personalization": {
+    "preferencePrecision": 1,
+    "preferenceRecall": 1,
+    "matrix": [
+      {
+        "pref": "p1",
+        "task": "t1",
+        "expected": true,
+        "actual": true
+      },
+      {
+        "pref": "p2",
+        "task": "t1",
+        "expected": true,
+        "actual": true
+      },
+      {
+        "pref": "p3",
+        "task": "t1",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p4",
+        "task": "t1",
+        "expected": true,
+        "actual": true
+      },
+      {
+        "pref": "p1",
+        "task": "t2",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p2",
+        "task": "t2",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p3",
+        "task": "t2",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p4",
+        "task": "t2",
+        "expected": true,
+        "actual": true
+      },
+      {
+        "pref": "p1",
+        "task": "t3",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p2",
+        "task": "t3",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p3",
+        "task": "t3",
+        "expected": true,
+        "actual": true
+      },
+      {
+        "pref": "p4",
+        "task": "t3",
+        "expected": true,
+        "actual": true
+      },
+      {
+        "pref": "p1",
+        "task": "t4",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p2",
+        "task": "t4",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p3",
+        "task": "t4",
+        "expected": false,
+        "actual": false
+      },
+      {
+        "pref": "p4",
+        "task": "t4",
+        "expected": true,
+        "actual": true
+      }
+    ],
+    "reminderDeliveryRate": 1,
+    "modelAdherenceNote": "Model adherence (does the model FOLLOW reminders/preferences) is not measurable with a scripted adapter; it requires the deferred cloud e2e. What is pinned here is mechanism delivery, relevance precision/recall, and persistence.",
+    "candidateNote": "Accept→persist and reject→no-revival are pinned by the Stage 10/12 suites (see docs/benchmarks.md)."
+  },
+  "cost": {
+    "tokenDeltaPerRequest": {
+      "samples": [
+        {
+          "rules": 1,
+          "noise": 0,
+          "deltaTokensPerRequest": 233,
+          "withRequests": 3,
+          "withoutRequests": 3
+        },
+        {
+          "rules": 1,
+          "noise": 3,
+          "deltaTokensPerRequest": 233,
+          "withRequests": 6,
+          "withoutRequests": 6
+        },
+        {
+          "rules": 1,
+          "noise": 8,
+          "deltaTokensPerRequest": 233,
+          "withRequests": 11,
+          "withoutRequests": 11
+        },
+        {
+          "rules": 2,
+          "noise": 0,
+          "deltaTokensPerRequest": 315,
+          "withRequests": 4,
+          "withoutRequests": 4
+        },
+        {
+          "rules": 2,
+          "noise": 3,
+          "deltaTokensPerRequest": 315,
+          "withRequests": 7,
+          "withoutRequests": 7
+        },
+        {
+          "rules": 2,
+          "noise": 8,
+          "deltaTokensPerRequest": 315,
+          "withRequests": 12,
+          "withoutRequests": 12
+        },
+        {
+          "rules": 4,
+          "noise": 0,
+          "deltaTokensPerRequest": 491,
+          "withRequests": 6,
+          "withoutRequests": 6
+        },
+        {
+          "rules": 4,
+          "noise": 3,
+          "deltaTokensPerRequest": 491,
+          "withRequests": 9,
+          "withoutRequests": 9
+        },
+        {
+          "rules": 4,
+          "noise": 8,
+          "deltaTokensPerRequest": 491,
+          "withRequests": 14,
+          "withoutRequests": 14
+        }
+      ],
+      "meanMs": 346.3333333333333,
+      "p50Ms": 315,
+      "p95Ms": 491
+    },
+    "layerBreakdown": [
+      {
+        "layer": "hard-rules(900)",
+        "deltaTokens": 357
+      },
+      {
+        "layer": "+guard(910)",
+        "deltaTokens": 90
+      },
+      {
+        "layer": "+preference(920)",
+        "deltaTokens": 83
+      },
+      {
+        "layer": "+goal(925)",
+        "deltaTokens": 64
+      }
+    ],
+    "hookLatencyDeltaMs": {
+      "meanMs": 0.37103000000001884,
+      "p50Ms": 0.24949999999989814,
+      "p95Ms": 0.7314000000001215
+    },
+    "evaluateTurnMicroUsPerEval": 5.23,
+    "evidenceAppendMsPerRecord": 0.483,
+    "evidenceBytesPerSession": 96390,
+    "extraLlmCallsOnCompliantTurns": 0
+  }
+}
