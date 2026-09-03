@@ -1,6 +1,6 @@
 import type { BehaviorGuardTrigger } from '../behavior/guard.ts'
 import type { CandidateBehavior } from '../behavior/types.ts'
-import type { BehaviorPatternValue, ConfirmRequest } from '../usermodel/schema.ts'
+import type { BehaviorPatternValue, ConfirmRequest, PreferenceValue } from '../usermodel/schema.ts'
 import type { UserModelStore } from '../usermodel/store.ts'
 
 export type ReviewAction = 'confirm' | 'edit' | 'reject' | 'skip'
@@ -10,6 +10,14 @@ export interface ReviewDecision {
   action: ReviewAction
   /** For 'edit': the user-revised reminder message. */
   message?: string
+  /**
+   * Stage 13: emit a `preference` record instead of a `behavior_pattern`.
+   * The CLI/UI owns the choice (and authors `preferenceValue`); this function
+   * stays deterministic and keeps the single `UserModelStore` write path.
+   */
+  as?: 'behavior_pattern' | 'preference'
+  /** Required when `as === 'preference'`: the authored preference content. */
+  preferenceValue?: PreferenceValue
 }
 
 export type ReviewResult =
@@ -62,19 +70,29 @@ export function applyReview(
     }
 
     switch (decision.action) {
-      case 'confirm':
-      case 'edit': {
-        const value: BehaviorPatternValue = {
-          message: decision.action === 'edit' ? decision.message ?? candidate.draftMessage : candidate.draftMessage,
-          trigger: triggerFromCandidate(candidate),
-        }
-        const record = store.create(
-          { kind: 'behavior_pattern', value, candidateId: candidate.id },
-          request,
-        )
+    case 'confirm':
+    case 'edit': {
+      if (decision.as === 'preference') {
+        // Soft preference: same `ConfirmRequest` boundary, same single write
+        // path — it is a `UserModelRecord` of `kind: 'preference'`, projected
+        // into prompts (never into the constraint engine).
+        const value: PreferenceValue = decision.preferenceValue
+          ?? { text: decision.message ?? candidate.draftMessage }
+        const record = store.create({ kind: 'preference', value }, request)
         outcomes.push({ candidateId: candidate.id, action: decision.action, result: 'record-created', recordId: record.id })
         break
       }
+      const value: BehaviorPatternValue = {
+        message: decision.action === 'edit' ? decision.message ?? candidate.draftMessage : candidate.draftMessage,
+        trigger: triggerFromCandidate(candidate),
+      }
+      const record = store.create(
+        { kind: 'behavior_pattern', value, candidateId: candidate.id },
+        request,
+      )
+      outcomes.push({ candidateId: candidate.id, action: decision.action, result: 'record-created', recordId: record.id })
+      break
+    }
       case 'reject': {
         hooks.onReject?.(candidate.signature)
         outcomes.push({ candidateId: candidate.id, action: decision.action, result: 'tombstoned' })
