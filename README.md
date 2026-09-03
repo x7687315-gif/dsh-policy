@@ -28,7 +28,7 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 
 ## Status
 
-**Stage 0–15 complete** (plan Phase 0–17). Verification baseline: `pnpm test` **134/134** across 21 files, `pnpm typecheck` clean, `pnpm build` green.
+**Stage 0–16 complete — the full project plan (Phase 0–18) is implemented.** Verification baseline: `pnpm test` **145/145** across 22 files, `pnpm typecheck` clean, `pnpm build` green, `pnpm bench` full-sweep benchmark green ([report](bench/report.json), [interpretation](docs/benchmarks.md)).
 
 **Phase 2 exit criterion achieved (2026-09-03):** integration tests against the real Harness loop prove that the Agent cannot finish a task while violating a hard project rule — and that the remediation path (run the tests → pass) unlocks completion.
 
@@ -50,8 +50,9 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 - [x] Stage 13 — preference layer & Context Resolver (token budget, relevance, order 920)
 - [x] Stage 14 — scopes (global/project/task) + lifecycle registry & CLI
 - [x] Stage 15 — full composition: goal model, `cordis.yml`, scenarios A–E end-to-end
+- [x] Stage 16 — benchmarks: constraint effectiveness / personalization effectiveness / cost
 
-Next up: **Stage 16 — benchmarks** (constraint effectiveness / personalization effectiveness / cost, plan Phase 18).
+Next: **hardening & deployment** — npm publish, cloud smoke test (DeepSeek key), registered engineering debts (see [docs/PROGRESS.md](docs/PROGRESS.md)).
 
 See [docs/PROGRESS.md](docs/PROGRESS.md) for the stage plan and next steps, [docs/architecture.md](docs/architecture.md) for the verified Harness extension seams.
 
@@ -59,7 +60,8 @@ See [docs/PROGRESS.md](docs/PROGRESS.md) for the stage plan and next steps, [doc
 
 ```bash
 pnpm install
-pnpm test   # 134 tests (21 files) — incl. the four POC cases A/B/C/D and scenarios A–E on the real Harness stack
+pnpm test   # 145 tests (22 files) — incl. the four POC cases A/B/C/D, scenarios A–E, and pinned benchmark rates
+pnpm bench  # full benchmark sweep -> bench/report.json
 pnpm demo   # end-to-end: BLOCK → remediation injected → tests run → PASS
 ```
 

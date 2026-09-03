@@ -9,7 +9,7 @@
 - **仓库**：https://github.com/x7687315-gif/dsh-policy
 - **技术栈**：TypeScript 5 (ESM) / Node ≥ 20 / pnpm / vitest / DeepSeek Harness (`@deepseek-ai/dsh-*` 0.1.1-rc.2 锁定) / Cordis 4.0.2
 - **运行环境约束**：本地不做任何模型推理（测试使用 ScriptedAdapter，零 GPU 负载）；LLM 调用一律走 DeepSeek 云端 API。
-- **验证基线**：`pnpm test` 117/117 全绿（17 个测试文件）；`pnpm typecheck` 干净；`pnpm build` 产出 dist/index.mjs。
+- **验证基线**：`pnpm test` 145/145 全绿（22 个测试文件）；`pnpm typecheck` 干净；`pnpm build` 产出 dist/index.mjs；`pnpm bench` 全量基准扫全绿（bench/report.json）。
 
 ## 阶段总表
 
@@ -28,6 +28,7 @@
 | Stage 10 | 行为观察引擎：4 类信号、确定性置信度、签名去重、拒绝墓碑、JSONL+原子投影、opt-in（Phase 7 ✅） | ✅ 完成 | 2026-09-03 | [stage-10](./stages/stage-10-行为观察引擎.md) | 3e7d514 |
 | Stage 11 | Behavior Guard：双注入通道（prompt 910 + post-execute 附加上下文）、类型隔离非阻塞不变量（Phase 8 ✅） | ✅ 完成 | 2026-09-03 | [stage-11](./stages/stage-11-BehaviorGuard.md) | fd62288 |
 | Stage 12 | User Model 单一写路径 + 审计、Review 流水线与 🧋 CLI（交互/管道双模式）、插件只读消费闭环（Phase 9/10 ✅，DSH UI 命令留 Stage 15） | ✅ 完成 | 2026-09-03 | [stage-12](./stages/stage-12-UserModel与Review.md) | c18ae09, b4e3865, 64fb67a |
+| Stage 16 | 基准测试：约束有效性/个性化有效性/成本三维度量化，发现并修复同毫秒证据序 P1 缺陷（Phase 18 ✅） | ✅ 完成 | 2026-09-03 | [stage-16](./stages/stage-16-基准测试.md) | 见提交记录 |
 
 ## 里程碑状态
 
@@ -43,6 +44,8 @@
 > ✅ **Phase 11/12 偏好层达成（2026-09-03，Stage 13）**：Context Resolver 纯函数（任务画像 + 三层级 → 最小上下文包）按 roadmap §6.2 落地；token 预算 800 + 层级→priority→recency 淘汰、硬规则永不淘汰；order 920 通道接线、偏好类型隔离不进约束引擎、复用 stage-12 单一写路径产出 preference 记录。验证基线升至 **87/87 测试（14 文件）**。详见 [stage-13](./stages/stage-13-偏好层与ContextResolver.md)。
 > ✅ **Phase 13-14 作用域与生命周期达成（2026-09-03，Stage 14）**：global/project/task 三层作用域合并 + 单调性校验期 fail-fast 拒绝弱化（双机制：`resolvePolicies` 保留强者保既有 20 单测，`validateScopeMonotonicity` 校验期拒绝）；项目生命周期 `project-registry.json`（active/pause/complete/archived）+ `dsh-project` CLI（archive 迁移目录、历史保留）；非 active 项目规则不泄漏。验证基线升至 **117/117 测试（17 文件）**。详见 [stage-14](./stages/stage-14-作用域与生命周期.md)。
 > ✅ **Phase 16-17 全量集成与端到端验收达成（2026-09-03，Stage 15）**：单一插件入口组合全部子系统（policy/behavior/user-model/context-resolver/goal）；目标模型 GoalNode 只注入一句、不自动分解；真实 `cordis.yml` 经无依赖配置解析器启动真实 Harness 组合测试（沙箱 `@cordisjs/loader` 未解包，等价替代）；场景 A-E 逐条端到端全绿。验证基线升至 **134/134 测试（21 文件）**。详见 [stage-15](./stages/stage-15-全量集成与端到端验收.md)。
+> ✅ **Phase 18 基准测试达成（2026-09-03，Stage 16）**：三维度量化——约束强制检出 100%/误拦截 0%/误放行 0%/补救成功 100%（36 例矩阵）、个性化机制精度/召回/送达 100%、成本每请求 ~315-491 tokens 线性开销 + 亚毫秒钩子 + **零额外 LLM 调用**（矩阵级断言）。**基准发现并修复同毫秒证据序 P1 缺陷**（误拦截 5.6% → 0%）。验证基线升至 **145/145 测试（22 文件）**。详见 [stage-16](./stages/stage-16-基准测试.md) 与 [benchmarks.md](./benchmarks.md)。
+> 🏁 **计划书 Phase 0-18 全部达成（2026-09-03）**——项目按原计划书的主线实施完毕，进入工程债清偿与部署阶段。
 
 ## 后续阶段（按计划书继续）
 
@@ -53,7 +56,7 @@
 | Stage 13 | 偏好层 / Context Resolver（按任务解析相关上下文） | Phase 11-12 | ✅ 完成 | [stage-13](./stages/stage-13-偏好层与ContextResolver.md) / 421937e, 93b7540, 2c1ac56, 88bc938, daf39f1 |
 | Stage 14 | 作用域完整实现（global 来源与 task scope）与项目生命周期 | Phase 13-14 | ✅ 完成 | [stage-14](./stages/stage-14-作用域与生命周期.md) / b96d721, 09fc271, b035056 |
 | Stage 15 | 全量 Harness 集成与端到端验收（场景 A-E） | Phase 16-17 | ✅ 完成 | [stage-15](./stages/stage-15-全量集成与端到端验收.md) / 398e3c2, ee67dea, ea64ce6, 160d3de |
-| Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 | ⬜ 未开始 | roadmap §9 |
+| Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 | ✅ 完成 | [stage-16](./stages/stage-16-基准测试.md) / 见提交记录 |
 
 ## 提交记录
 
@@ -92,17 +95,22 @@
 | 2026-09-03 | ea64ce6 | test: 目标模型/配置解析/Loader 组合/Scenario A-E 端到端 — Stage 15 |
 | 2026-09-03 | 160d3de | docs: stage-15 报告 + PROGRESS 更新 — Stage 15 |
 | 2026-09-03 | （本次） | docs: sync README/PROGRESS/architecture to Stage 15 baseline — 文档一致性 |
-| 2026-09-03 | （本次） | fix: readGoals robustness, key-order monotonicity, archive sanitization — 审查轮（138 测试） |
+| 2026-09-03 | 4d16a23 | fix: readGoals robustness, key-order monotonicity, archive sanitization — 审查轮（138 测试） |
+| 2026-09-03 | （本次） | feat: benchmark suite (matrix/runner/pinned tests) — Stage 16 |
+| 2026-09-03 | （本次） | fix: strictly-increasing evidence timestamps (P1 false-block found by bench) — Stage 16 |
+| 2026-09-03 | （本次） | docs: benchmarks.md + stage-16 report + PROGRESS sync — Stage 16 |
 
 > 注：审计与加固提交（36609ca、732c9d3、b118e14）位于 Stage 13-15 之前，已在里程碑区引用。
 > 另：`64fb67a`（API 重建的 handled-candidates 修复）与本地的 `071e467` 为同一补丁，历史上以其为准。
 
-## 剩余工作（下一轮入口）
+## 剩余工作（主线完毕，进入清偿与部署）
 
+- npm 发布（打包/导出就绪；待命名/版本策略与 changesets）；
+- 云端烟测（带 DeepSeek key 的 e2e：真实回合 BLOCK/PASS + 模型遵循率度量，`examples/cordis.yml` 已布好）；
 - guard taskRegex 通道的多会话隔离（AssembleContext 无会话标识，需 per-session 注入上下文——见 stage-12 报告已知限制）；
+- store 的同步 fs 写入改异步/批量（MVP 取舍，stage-8 登记）；
 - `test_fail_streak` 观察信号实现（需跨事件关联）；
-- store 的同步 fs 写入改异步/批量（当前为 MVP 取舍，已在 stage-8 报告记录）；
-- npm 发布（打包就绪，待命名/版本策略决定）与 changesets。
+- `src/config/loader.ts` YAML 子集按需扩展（锚点/多行字符串出现时）。
 
 ## 硬性流程约定
 
