@@ -135,6 +135,31 @@ describe('BehaviorStore + runtime wiring', () => {
     memory?.note(observation({ signature: 'remediation_repeated:r7', sessionId: 'b', at: 2_000 }))
     expect(memory?.candidates()).toHaveLength(1) // works in memory, writes nothing
   })
+
+  it('REGRESSION: handled candidates never re-surface, even after restart', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-behavior-handled-'))
+    try {
+      const runtime = createBehaviorRuntime({ enabled: true, root, now: () => 5_000 })
+      runtime?.note(observation({ signature: 'remediation_repeated:r8', sessionId: 'a' }))
+      runtime?.note(observation({ signature: 'remediation_repeated:r8', sessionId: 'b', at: 2_000 }))
+      const [pending] = runtime?.candidates() ?? []
+      expect(pending).toBeDefined()
+
+      // The review flow confirmed this candidate → mark handled.
+      runtime?.markHandled(pending!.id)
+      expect(runtime?.candidates()).toHaveLength(0)
+
+      // A fresh runtime (restart) must ALSO hide it: the observation log
+      // still holds the records, but handled.json wins.
+      const revived = createBehaviorRuntime({ enabled: true, root, now: () => 5_000 })
+      expect(revived?.candidates()).toHaveLength(0)
+      // New occurrences of the SAME candidate id stay suppressed...
+      revived?.note(observation({ signature: 'remediation_repeated:r8', sessionId: 'c', at: 6_000 }))
+      expect(revived?.candidates()).toHaveLength(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('correction heuristic', () => {

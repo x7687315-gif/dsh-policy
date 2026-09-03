@@ -20,7 +20,9 @@ export interface BehaviorOptions {
 export interface BehaviorRuntime {
   note(record: ObservationRecord): void
   reject(signature: string): void
-  /** Current promoted candidates (already the durable projection's source of truth). */
+  /** Candidate ids already acted upon by the review flow — never re-surfaced. */
+  markHandled(candidateId: string): void
+  /** Current promoted, un-handled candidates (source of truth for the queue file). */
   candidates(): CandidateBehavior[]
 }
 
@@ -35,12 +37,17 @@ export function createBehaviorRuntime(options: BehaviorOptions = {}): BehaviorRu
   const store = new BehaviorStore(options.root)
   const observer = new BehaviorObserver({ threshold: options.threshold, now: options.now })
   observer.hydrate(store.loadObservations(), store.loadTombstones())
+  const handled = new Set<string>(store.loadHandled())
   // Rebuild the projection on boot too: the file may be stale (crash between
   // append and last sync) and thresholds may have changed.
-  store.saveCandidates(observer.candidates())
+  store.saveCandidates(pendingCandidates())
+
+  function pendingCandidates(): CandidateBehavior[] {
+    return observer.candidates().filter(candidate => !handled.has(candidate.id))
+  }
 
   const sync = (): void => {
-    store.saveCandidates(observer.candidates())
+    store.saveCandidates(pendingCandidates())
   }
 
   return {
@@ -54,7 +61,12 @@ export function createBehaviorRuntime(options: BehaviorOptions = {}): BehaviorRu
       store.saveTombstones([...new Set([...store.loadTombstones(), signature])])
       sync()
     },
-    candidates: () => observer.candidates(),
+    markHandled(candidateId): void {
+      handled.add(candidateId)
+      store.saveHandled([...handled])
+      sync()
+    },
+    candidates: () => pendingCandidates(),
   }
 }
 

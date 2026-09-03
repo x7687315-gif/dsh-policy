@@ -105,6 +105,11 @@ async function main(): Promise<void> {
   const outcomes = applyReview(candidates, store, decisions, { via: 'review-cli', note: 'review' }, {
     onReject: signature => behavior?.reject(signature),
   })
+  // Confirmed/edited candidates must never re-surface in a later review run
+  // (a second confirm would create a duplicate durable record).
+  for (const outcome of outcomes) {
+    if (outcome.result === 'record-created') behavior?.markHandled(outcome.candidateId)
+  }
 
   console.log('═'.repeat(72))
   for (const outcome of outcomes) {

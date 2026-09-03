@@ -5,6 +5,7 @@ import type { CandidateBehavior, ObservationRecord } from './types.ts'
 export const OBSERVATIONS_FILE = 'observations.jsonl'
 export const TOMBSTONES_FILE = 'tombstones.json'
 export const CANDIDATES_FILE = 'candidates.json'
+export const HANDLED_FILE = 'handled.json'
 
 /**
  * Durable projection for the observation engine (same JSONL/append-only
@@ -58,6 +59,15 @@ export class BehaviorStore {
   /** Full atomic rewrite — the candidate list is small and recomputed wholesale. */
   saveCandidates(candidates: readonly CandidateBehavior[]): void {
     this.#writeJsonAtomic(CANDIDATES_FILE, candidates)
+  }
+
+  /** Candidate ids already acted upon by the review flow (confirmed/edited). */
+  loadHandled(): string[] {
+    return this.#readJson<string[]>(HANDLED_FILE, [])
+  }
+
+  saveHandled(ids: readonly string[]): void {
+    this.#writeJsonAtomic(HANDLED_FILE, ids)
   }
 
   #file(name: string): string {

@@ -77,8 +77,9 @@
 
 ## 剩余工作（下一轮入口）
 
-- Stage 10 行为观察引擎（Phase 7）：观察记录 schema、重复模式检测、去重、置信度——观察与持久用户状态严格分离；
-- REMEDIATE 状态显式化与多规则 remediation 合并（Phase 5 收尾）；
+- Stage 13 偏好层与 Context Resolver（Phase 11-12，roadmap §6）：appliesTo 相关性匹配、token 预算硬上限与淘汰顺序；
+- guard taskRegex 通道的多会话隔离（AssembleContext 无会话标识，需 per-session 注入上下文——见 stage-12 报告已知限制）；
+- `test_fail_streak` 观察信号实现（需跨事件关联）；
 - global 作用域策略来源（用户级配置文件）与 task scope（Phase 13）；
 - store 的同步 fs 写入改异步/批量（当前为 MVP 取舍，已在 stage-8 报告记录）；
 - npm 发布（打包就绪，待命名/版本策略决定）与 changesets。
