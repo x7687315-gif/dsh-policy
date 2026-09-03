@@ -108,6 +108,22 @@ describe('archiveProject', () => {
     expect(moved[0]).toMatch(/^dsh-policy-myproj-/)
   })
 
+  it('REGRESSION: sanitizes the project id in the archive directory name', () => {
+    const projectDir = join(dir, 'traversal-proj')
+    const policyDir = join(projectDir, '.dsh-policy')
+    mkdirSync(policyDir, { recursive: true })
+    writeFileSync(join(policyDir, 'policy.json'), '{}')
+
+    const registry: ProjectRegistry = { projects: {} }
+    // A hostile id must not steer the rename outside <projectDir>/archive/.
+    archiveProject('../../evil', projectDir, registry, registryPath())
+
+    const moved = readdirSync(join(projectDir, 'archive'))
+    expect(moved.length).toBe(1)
+    expect(moved[0]).toMatch(/^dsh-policy-_/)
+    expect(moved[0]).not.toContain('..')
+  })
+
   it('still marks archived when no .dsh-policy directory exists', () => {
     const projectDir = join(dir, 'empty-proj')
     mkdirSync(projectDir, { recursive: true })

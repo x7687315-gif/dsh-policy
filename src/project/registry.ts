@@ -96,7 +96,11 @@ export function archiveProject(
   if (existsSync(source)) {
     const archiveDir = join(projectDir, 'archive')
     mkdirSync(archiveDir, { recursive: true })
-    const destination = join(archiveDir, `dsh-policy-${projectId}-${Date.now()}`)
+    // Sanitize the id into the directory name: a project id is also used as a
+    // registry key and may in principle contain separators — it must never be
+    // able to steer the rename outside `<projectDir>/archive/`.
+    const safeId = projectId.replace(/[^a-zA-Z0-9_-]/g, '_')
+    const destination = join(archiveDir, `dsh-policy-${safeId}-${Date.now()}`)
     renameSync(source, destination)
   }
   const next = setProjectState(registry, projectId, 'archived')

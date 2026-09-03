@@ -90,7 +90,7 @@ describe('Context Resolver — token budget eviction (roadmap §6.2)', () => {
     expect(bundle.truncation).toBeDefined()
     expect(bundle.truncation!.omittedCount).toBeGreaterThan(0)
     const allText = bundle.sections.map(s => s.text).join('\n')
-    expect(allText).toMatch(/\(\+\d+ rules omitted/)
+    expect(allText).toMatch(/\(\+\d+ items omitted/)
 
     // Highest-priority preferences survive; lowest are dropped.
     const prefSection = bundle.sections.find(s => s.order === 920)

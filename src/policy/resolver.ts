@@ -132,7 +132,23 @@ export function validateScopeMonotonicity(policies: ScopedPolicy[]): Monotonicit
   return { ok: true }
 }
 
-/** Shallow-but-sufficient structural equality for two hard rules (id excluded). */
+/**
+ * Structural equality for two hard rules (id excluded). Key order is
+ * canonicalized before comparison: two JSON documents carrying the same rule
+ * with different key order are semantically identical and must NOT trigger a
+ * "redefinition" rejection.
+ */
 function rulesEqual(a: HardRule, b: HardRule): boolean {
-  return JSON.stringify({ ...a, id: '' }) === JSON.stringify({ ...b, id: '' })
+  return canonicalize(a) === canonicalize(b)
+}
+
+function canonicalize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
+      .map(([key, v]) => `${JSON.stringify(key)}:${canonicalize(v)}`)
+    return `{${entries.join(',')}}`
+  }
+  return JSON.stringify(value)
 }

@@ -238,7 +238,7 @@ export function resolveContext(input: ResolveContextInput): ContextBundle {
   }
   if (omitted > 0) {
     const last = sections[sections.length - 1]
-    if (last) last.text += `\n(+${omitted} rules omitted to stay within the ${budget}-token budget)`
+    if (last) last.text += `\n(+${omitted} items omitted to stay within the ${budget}-token budget)`
   }
 
   return omitted > 0 ? { sections, truncation: { omittedCount: omitted } } : { sections }

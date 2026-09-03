@@ -21,6 +21,17 @@ function scoped(scope: RuleScope, hard: HardRule[]): ScopedPolicy {
 const globalDeny: HardRule = { id: 'forbid-drop', trigger: 'always', denyTools: ['drop_database'], enforcement: 'hard' }
 
 describe('validateScopeMonotonicity', () => {
+  it('REGRESSION: key-order differences are NOT a redefinition', () => {
+    // Same rule as the global one, but serialized with a different key order —
+    // semantically identical, so it must not be rejected as a weakening.
+    const reordered = { enforcement: 'hard', denyTools: ['drop_database'], trigger: 'always', id: 'forbid-drop' } as unknown as HardRule
+    const result = validateScopeMonotonicity([
+      scoped('global', [globalDeny]),
+      scoped('task', [reordered]),
+    ])
+    expect(result).toEqual({ ok: true })
+  })
+
   it('allows identical cross-scope re-declaration (redundant but not weakening)', () => {
     const result = validateScopeMonotonicity([
       scoped('global', [globalDeny]),

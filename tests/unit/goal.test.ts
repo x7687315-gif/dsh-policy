@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { goalContextText, resolveContext, type ResolveContextInput } from '../../src/context/resolver.ts'
 import type { Resolution } from '../../src/policy/resolver.ts'
+import { readGoals } from '../../src/goal/store.ts'
 import type { GoalNode } from '../../src/goal/types.ts'
 
 const EMPTY_RESOLUTION: Resolution = { rules: [], conflicts: [], monotonicityNotes: [] }
@@ -59,5 +63,35 @@ describe('goal model (roadmap §7.3)', () => {
     const orders = linked.sections.map(s => s.order)
     expect(orders).toContain(925)
     expect(orders.filter(o => o === 925)).toHaveLength(1)
+  })
+})
+
+describe('readGoals (file robustness)', () => {
+
+  it('accepts a bare array and a { goals: [...] } envelope', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-goals-'))
+    try {
+      const bare = join(dir, 'bare.json')
+      writeFileSync(bare, JSON.stringify(GOALS))
+      expect(readGoals(bare)).toEqual(GOALS)
+
+      const envelope = join(dir, 'envelope.json')
+      writeFileSync(envelope, JSON.stringify({ goals: GOALS }))
+      expect(readGoals(envelope)).toEqual(GOALS)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('REGRESSION: a corrupt goals file yields [] instead of failing plugin activation', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-goals-bad-'))
+    try {
+      const corrupt = join(dir, 'corrupt.json')
+      writeFileSync(corrupt, '{ not valid json')
+      expect(() => readGoals(corrupt)).not.toThrow()
+      expect(readGoals(corrupt)).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
