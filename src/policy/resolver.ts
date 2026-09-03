@@ -1,4 +1,5 @@
-import type { HardRule, PolicyDocument, RuleScope } from './schema.ts'
+import type { HardRule, PolicyDocument, RuleScope, ToolPassRule } from './schema.ts'
+import { requireTool } from './schema.ts'
 
 export interface ScopedPolicy {
   scope: RuleScope
@@ -52,4 +53,22 @@ export function resolvePolicies(policies: ScopedPolicy[]): Resolution {
   }
 
   return { rules, conflicts, monotonicityNotes }
+}
+
+/**
+ * Human-readable hard-rule summary injected into the model prompt (order 900).
+ * Moved here from the plugin entry so the pure Context Resolver can reuse it
+ * without creating a `context → plugin` layering cycle.
+ */
+export function summarizeRules(resolution: Resolution): string {
+  const lines: string[] = ['[dsh-policy] Active hard project rules (runtime-enforced, not optional):']
+  for (const rule of resolution.rules) {
+    if ('denyTools' in rule) {
+      lines.push(`- ${rule.id}: MUST NOT call tools [${rule.denyTools.join(', ')}]`)
+    } else {
+      const requirement = typeof rule.require === 'string' ? rule.require : `a passing "${rule.require.tool}" run`
+      lines.push(`- ${rule.id}: after code changes, ${requirement} must hold (verified from real tool results, not from your claims)`)
+    }
+  }
+  return lines.join('\n')
 }
