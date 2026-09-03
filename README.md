@@ -6,6 +6,37 @@ A policy-driven runtime extension that lets users define project-level **hard co
 
 > The system is not merely telling the Agent what to do. It is enforcing what the Agent is allowed to finish.
 
+## What the plugin actually does
+
+dsh-policy hooks into four verified DeepSeek Harness seams and turns your policy file into runtime enforcement:
+
+```
+Agent edits code          ──► tools/post-execute ──► normalized evidence (real tool results)
+Agent calls a MUST NOT tool ─► tools/pre-execute ───► DENIED before the tool body runs
+Agent says "done"         ──► agent/turn-stopping ──► evaluate hard rules
+        violated, budget left                        ► BLOCK: remediation injected as a user message
+                                                       (the loop re-opens the turn — the model must act)
+        budget exhausted                             ► the turn can only end as an ERROR (never a fake completion)
+        all rules pass                               ► the turn completes normally
+```
+
+Subsystems behind that pipeline:
+
+| Subsystem | What it does | Where it hooks |
+|---|---|---|
+| **Policy loader & validator** | Reads `.dsh-policy/policy.json`, fails loudly on anything malformed (including bad regexes) | activation |
+| **Scope resolver** | Merges global / project / task rules; enforces Constraint Monotonicity (specific scopes may ADD rules, never weaken stronger ones) | activation |
+| **Constraint engine** | Pure function `evaluate(rules, evidence) → PASS \| BLOCK + remediation`; fail-closed | `agent/turn-stopping` |
+| **MUST NOT gate** | Forbidden tools are denied before their body executes | `tools/pre-execute` |
+| **Evidence store** | Per-session JSONL of real tool results; survives restarts (an unremediated violation keeps blocking) | `tools/post-execute` |
+| **Behavior observation** | Detects recurring patterns (repeated remediations, denied-tool retries, user corrections) — zero extra LLM calls; candidates NEVER become rules without user review | `session/event` + enforcement actions |
+| **Behavior Guard** | User-confirmed, contextual, NEVER-blocking reminders (type-isolated from hard rules) | prompt layer 910 + `post-execute` context |
+| **User Model + 🧋 Review** | Durable personalization with a single write path (`ConfirmRequest`), full audit trail, interactive review CLI | CLI (the only writer) |
+| **Context Resolver** | Injects only task-relevant preferences/goals under a hard 800-token budget; hard rules are never evicted | prompt layers 920/925 |
+| **Project lifecycle** | Paused/completed/archived projects stop contributing rules | activation (registry) |
+
+Verification baseline: **145/145 tests** across 22 files, benchmarked end-to-end (see [docs/benchmarks.md](docs/benchmarks.md)).
+
 ## Why
 
 Most "memory plugins" put more user information into a prompt. This project is different: the Agent operates inside a **user-controlled policy boundary** with three layers:
@@ -26,11 +57,145 @@ Core invariants:
 
 It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second agent framework.
 
+## Installation
+
+> **Note:** the package is not yet published to npm. Until then, install from GitHub or a local checkout (see below); once published it will be `pnpm add dsh-policy`.
+
+### 1. Add the dependency
+
+```bash
+# from GitHub (pin a commit/tag for reproducibility)
+pnpm add github:x7687315-gif/dsh-policy
+
+# or from a local checkout
+pnpm add ./path/to/dsh-policy
+```
+
+Requirements: Node ≥ 20, pnpm (or npm/yarn), and a DeepSeek Harness runtime with the Cordis loader.
+
+### 2a. Wire it into your Harness via `cordis.yml` (recommended)
+
+```yaml
+plugins:
+  # your LLM adapter — the API key comes from the environment, never a file
+  - name: '@deepseek-ai/dsh-llm-deepseek'
+    options:
+      apiKey: ${DEEPSEEK_API_KEY}
+      model: deepseek-chat
+      baseURL: https://api.deepseek.com
+
+  - name: dsh-policy
+    options:
+      policyPath: .dsh-policy/policy.json   # your project's hard rules
+      userModelPath: ~/.dsh-policy/user-model.json
+      behavior:
+        enabled: true                       # opt-in pattern observation
+      context:
+        tokenBudget: 800                    # prompt budget for guidance/preferences
+      projectId: my-project                 # enables the lifecycle registry
+```
+
+A complete production example lives at [`examples/cordis.yml`](examples/cordis.yml).
+
+### 2b. Or mount it programmatically
+
+```ts
+import { dshPolicy } from 'dsh-policy'
+
+await ctx.plugin(dshPolicy, {
+  policyPath: '.dsh-policy/policy.json',
+  behavior: { enabled: true },
+})
+```
+
+### 3. Write your first policy
+
+Create `.dsh-policy/policy.json` in your project:
+
+```json
+{
+  "project": "my-api",
+  "policy": {
+    "hard": [
+      { "id": "test-after-code-change", "trigger": "code_change", "require": "tests_pass", "enforcement": "hard" },
+      { "id": "no-dangerous-commands", "trigger": "always", "denyTools": ["drop_database"], "enforcement": "hard" }
+    ]
+  }
+}
+```
+
+The full schema (tool-pass rules, deny rules, evidence matchers, scopes, remediation text) is documented in **[docs/policy.md](docs/policy.md)**.
+
+### Plugin options
+
+| Option | Default | Purpose |
+|---|---|---|
+| `policy` / `policyPath` | `<cwd>/.dsh-policy/policy.json` | Project hard rules (inline wins over path) |
+| `globalPolicy` / `globalPolicyPath` | `~/.dsh-policy/policy.json` | Cross-project hard rules |
+| `taskRules` | — | Additive-only task-scope rules |
+| `projectId` / `projectRegistryPath` | `~/.dsh-policy/project-registry.json` | Lifecycle: paused/archived projects stop enforcing |
+| `maxRemediations` | `2` | Injected remediations per turn before hard refusal |
+| `evidenceRoot` | in-memory | Directory for durable per-session JSONL evidence |
+| `behavior` | disabled | Pattern observation (writes candidates for review, never rules) |
+| `userModelPath` | — | Read-only consumption of confirmed guards/preferences |
+| `guards` / `preferences` / `goals` | — | Inline overrides of the user-model projections |
+| `context.tokenBudget` | `800` | Prompt budget for guidance/preferences (hard rules never evicted) |
+
+## Running things
+
+```bash
+pnpm install
+pnpm test        # 145 tests / 22 files — real Harness stack, scripted LLM (no API key needed)
+pnpm bench       # full benchmark sweep -> bench/report.json (constraint/personalization/cost)
+pnpm demo        # end-to-end: BLOCK -> remediation injected -> tests run -> PASS
+pnpm typecheck   # strict TS, zero errors
+pnpm build       # tsdown -> dist/ (npm-publishable bundle)
+```
+
+### 🧋 Review CLI — confirm or reject behavior candidates
+
+Observation produces **candidates**; only you make them durable:
+
+```bash
+pnpm tsx src/review/cli.ts --candidates <behaviorRoot> --model ~/.dsh-policy/user-model.json
+```
+
+For each candidate it shows the evidence, occurrence counts and confidence, then asks:
+`[y] confirm / [e <msg>] edit / [n] reject / [s] skip`. Confirmed candidates become
+Behavior Guards on the next activation; rejected ones are tombstoned and never resurface.
+The CLI is the ONLY writer of the user model, and every change is audited.
+
+### Project lifecycle CLI
+
+```bash
+pnpm project pause <projectId>     # rules stop contributing to new sessions
+pnpm project resume <projectId>
+pnpm project complete <projectId>
+pnpm project archive <projectId>   # .dsh-policy moved to archive/, history kept
+```
+
+### Production run
+
+1. `export DEEPSEEK_API_KEY=...` (never commit keys),
+2. start your Harness with [`examples/cordis.yml`](examples/cordis.yml),
+3. the plugin loads your policy, tells the model the rules in its prompt, and enforces them at the turn boundary — no local inference, all LLM calls go to the DeepSeek cloud API.
+
+### Enforcement behavior at a glance
+
+```
+Agent edits code                     → tools/post-execute records code_change (real tool result)
+Agent says "done" without tests      → agent/turn-stopping evaluates the policy
+                                     → BLOCK: remediation injected as a user message
+Agent runs tests, tests fail again   → BLOCK again (within the remediation budget)
+Budget exhausted while still violated → the turn can only end as an error (never a fake completion)
+Agent runs tests, tests pass         → PASS: the turn may complete
+Agent calls a MUST NOT tool          → tools/pre-execute denies the call before the body runs
+Every step                           → the model sees the active rules in its prompt (explanation ≠ enforcement)
+```
+
 ## Status
 
 **Stage 0–16 complete — the full project plan (Phase 0–18) is implemented.** Verification baseline: `pnpm test` **145/145** across 22 files, `pnpm typecheck` clean, `pnpm build` green, `pnpm bench` full-sweep benchmark green ([report](bench/report.json), [interpretation](docs/benchmarks.md)).
-
-**Phase 2 exit criterion achieved (2026-09-03):** integration tests against the real Harness loop prove that the Agent cannot finish a task while violating a hard project rule — and that the remediation path (run the tests → pass) unlocks completion.
 
 - [x] Stage 0 — repository foundation
 - [x] Stage 1 — Harness integration verification (turn-stopping blocking mechanism confirmed)
@@ -54,31 +219,49 @@ It is implemented as a **native DeepSeek Harness plugin** (Cordis), not a second
 
 Next: **hardening & deployment** — npm publish, cloud smoke test (DeepSeek key), registered engineering debts (see [docs/PROGRESS.md](docs/PROGRESS.md)).
 
-See [docs/PROGRESS.md](docs/PROGRESS.md) for the stage plan and next steps, [docs/architecture.md](docs/architecture.md) for the verified Harness extension seams.
+## Engineering reports — everything we did, stage by stage
 
-## Quick start
+Each stage below has a full report (what was done, how, and where the project stood afterwards). Start with the [project plan](docs/project-plan.md) (the original specification) and the [stage table](docs/PROGRESS.md) (current status), then dive into any stage:
 
-```bash
-pnpm install
-pnpm test   # 145 tests (22 files) — incl. the four POC cases A/B/C/D, scenarios A–E, and pinned benchmark rates
-pnpm bench  # full benchmark sweep -> bench/report.json
-pnpm demo   # end-to-end: BLOCK → remediation injected → tests run → PASS
-```
+**Foundation**
 
-No API key and no local inference required: tests and the demo use a scripted LLM adapter (the only mock, per the official Harness testing philosophy).
+- [Stage 0 — 仓库奠基](docs/stages/stage-0-仓库奠基.md) — scaffold, doc system, GitHub repo
+- [Stage 1 — Harness 接入验证](docs/stages/stage-1-harness接入验证.md) — real extension APIs verified, turn-stopping mechanism confirmed
+- [Stage 2 — 策略与引擎核心](docs/stages/stage-2-策略与引擎核心.md) — schema / validator / loader / evidence / pure engine
+- [Stage 3 — POC 集成测试](docs/stages/stage-3-POC集成测试.md) — the four cases proving an agent cannot finish while violating the policy
+- [Stage 4 — 收尾同步](docs/stages/stage-4-收尾同步.md)
 
-### Enforcement behavior
+**Generalization**
 
-```
-Agent edits code                     → tools/post-execute records code_change (real tool result)
-Agent says "done" without tests      → agent/turn-stopping evaluates the policy
-                                     → BLOCK: remediation injected as a user message
-Agent runs tests, tests fail again   → BLOCK again (within the remediation budget)
-Budget exhausted while still violated → the turn can only end as an error (never a fake completion)
-Agent runs tests, tests pass         → PASS: the turn may complete
-Agent calls a MUST NOT tool          → tools/pre-execute denies the call before the body runs
-Every step                           → the model sees the active rules in its prompt (explanation ≠ enforcement)
-```
+- [Stage 5 — 规则模型泛化](docs/stages/stage-5-规则模型泛化.md) — two rule kinds, scope resolution, Constraint Monotonicity
+- [Stage 6 — MUST NOT 门禁与规则可见性](docs/stages/stage-6-MUST-NOT门禁与规则可见性.md) — pre-execute deny gate, prompt layers, root-scope finding
+- [Stage 7 — CI](docs/PROGRESS.md) — GitHub Actions (typecheck + tests on push/PR)
+- [Stage 8 — 持久化与 HMR 安全](docs/stages/stage-8-持久化与HMR安全.md) — per-session JSONL evidence, restart survival, policy authoring guide
+- [Stage 9 — 缺陷审查与修复](docs/stages/stage-9-缺陷审查与修复.md) — per-turn budget, root-registration cleanup, strict deny trigger
+
+**Personalization**
+
+- [Stage 10 — 行为观察引擎](docs/stages/stage-10-行为观察引擎.md) — deterministic patterns, confidence formula, rejection tombstones
+- [Stage 11 — Behavior Guard](docs/stages/stage-11-BehaviorGuard.md) — contextual never-blocking guidance, type-isolation invariant
+- [Stage 12 — User Model 与 Review](docs/stages/stage-12-UserModel与Review.md) — single write path + audit + 🧋 CLI (interactive/piped)
+- [Security audit — L1/L2 架构安全审计](docs/stages/stage-audit-L1L2-架构安全审计.md) — soft layers cannot gain BLOCK or bypass authorization
+- [Hardening — R1/R2](docs/stages/stage-fix-R1R2-正则校验与失败闭合.md) — regex fail-fast + fail-closed turn gate
+
+**Composition & verification**
+
+- [Stage 13 — 偏好层与 Context Resolver](docs/stages/stage-13-偏好层与ContextResolver.md) — relevance matching, 800-token budget, order 920
+- [Stage 14 — 作用域与生命周期](docs/stages/stage-14-作用域与生命周期.md) — global/project/task scopes, lifecycle registry & CLI
+- [Stage 15 — 全量集成与端到端验收](docs/stages/stage-15-全量集成与端到端验收.md) — goal model, cordis.yml, scenarios A–E
+- [Stage 16 — 基准测试](docs/stages/stage-16-基准测试.md) — three-dimension benchmark + the P1 defect it caught
+- [Review round — 一致性/全局性/安全性审查](docs/stages/stage-review-一致性全局性安全性.md) — cross-cutting defect review
+
+**Reference documents**
+
+- [docs/architecture.md](docs/architecture.md) — verified Harness extension seams & findings
+- [docs/policy.md](docs/policy.md) — how to write a policy file
+- [docs/benchmarks.md](docs/benchmarks.md) — benchmark interpretation
+- [docs/roadmap.md](docs/roadmap.md) — technical plans for every stage
+- [docs/PROGRESS.md](docs/PROGRESS.md) — the live stage table & commit log
 
 ## License
 
