@@ -42,6 +42,7 @@
 > ✅ **L1/L2 架构审计 + 安全加固（2026-09-03）**：审计证明 Behavior Guard / User Model / Preference 均无法绕过授权或获得硬层 BLOCK 权限（类型隔离 + 只读消费 + Preference 未实现）；在此结论上加固硬层自身——passPattern 校验期编译 fail-fast（R1）、回合闸门 fail-closed（R2）。验证基线升至 **69/69 测试（11 文件）**。详见 [stage-audit-L1L2](./stages/stage-audit-L1L2-架构安全审计.md) 与 [stage-fix-R1R2](./stages/stage-fix-R1R2-正则校验与失败闭合.md)。
 > ✅ **Phase 11/12 偏好层达成（2026-09-03，Stage 13）**：Context Resolver 纯函数（任务画像 + 三层级 → 最小上下文包）按 roadmap §6.2 落地；token 预算 800 + 层级→priority→recency 淘汰、硬规则永不淘汰；order 920 通道接线、偏好类型隔离不进约束引擎、复用 stage-12 单一写路径产出 preference 记录。验证基线升至 **87/87 测试（14 文件）**。详见 [stage-13](./stages/stage-13-偏好层与ContextResolver.md)。
 > ✅ **Phase 13-14 作用域与生命周期达成（2026-09-03，Stage 14）**：global/project/task 三层作用域合并 + 单调性校验期 fail-fast 拒绝弱化（双机制：`resolvePolicies` 保留强者保既有 20 单测，`validateScopeMonotonicity` 校验期拒绝）；项目生命周期 `project-registry.json`（active/pause/complete/archived）+ `dsh-project` CLI（archive 迁移目录、历史保留）；非 active 项目规则不泄漏。验证基线升至 **117/117 测试（17 文件）**。详见 [stage-14](./stages/stage-14-作用域与生命周期.md)。
+> ✅ **Phase 16-17 全量集成与端到端验收达成（2026-09-03，Stage 15）**：单一插件入口组合全部子系统（policy/behavior/user-model/context-resolver/goal）；目标模型 GoalNode 只注入一句、不自动分解；真实 `cordis.yml` 经无依赖配置解析器启动真实 Harness 组合测试（沙箱 `@cordisjs/loader` 未解包，等价替代）；场景 A-E 逐条端到端全绿。验证基线升至 **134/134 测试（21 文件）**。详见 [stage-15](./stages/stage-15-全量集成与端到端验收.md)。
 
 ## 后续阶段（按计划书继续）
 
@@ -51,7 +52,7 @@
 |---|---|---|
 | Stage 13 | 偏好层 / Context Resolver（按任务解析相关上下文） | Phase 11-12 | ✅ 完成 | 2026-09-03 | [stage-13](./stages/stage-13-偏好层与ContextResolver.md) | 421937e, 93b7540, 2c1ac56, 88bc938, daf39f1 |
 | Stage 14 | 作用域完整实现（global 来源与 task scope）与项目生命周期 | Phase 13-14 | ✅ 完成 | 2026-09-03 | [stage-14](./stages/stage-14-作用域与生命周期.md) | b96d721, 09fc271, b035056 |
-| Stage 15 | 全量 Harness 集成与端到端验收（场景 A-E） | Phase 16-17 |
+| Stage 15 | 全量 Harness 集成与端到端验收（场景 A-E） | ✅ 完成 | 2026-09-03 | [stage-15](./stages/stage-15-全量集成与端到端验收.md) | 398e3c2, ee67dea, ea64ce6 |
 | Stage 16 | 基准测试（约束有效性 / 个性化有效性 / 成本） | Phase 18 |
 
 ## 提交记录
