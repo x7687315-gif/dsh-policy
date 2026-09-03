@@ -11,9 +11,33 @@ export interface BehaviorPatternValue {
   severity?: 'info' | 'warn'
 }
 
-/** Minimal preference content for v1 (resolution arrives in Stage 13). */
+/** Relevance input for the Context Resolver (roadmap §6.1). */
+export interface PreferenceAppliesTo {
+  /** Match by inferred language, e.g. 'typescript' (from file extension). */
+  language?: string
+  /** Match by file glob, e.g. a 'src/**' pattern. */
+  fileGlob?: string[]
+  /** Match when the latest user message matches this regex. */
+  taskRegex?: string
+}
+
+/**
+ * Preference content (Stage 13): soft, non-binding guidance with relevance
+ * metadata. Stored as a `UserModelRecord` of `kind: 'preference'` — the
+ * record envelope (id/scope/enabled/createdAt/updatedAt/provenance) already
+ * lives on `UserModelRecord`, so we only enrich the *value* here. No zod: the
+ * project validates by hand-rolled types, and the single write path
+ * (`UserModelStore.create` + `ConfirmRequest`) is the real safety boundary.
+ */
 export interface PreferenceValue {
+  /** The soft guidance text injected into the model prompt. */
   text: string
+  /** 'style' (e.g. async/await, quote style) or 'workflow' (e.g. review diffs before commit). */
+  kind?: 'style' | 'workflow'
+  /** Relevance input for the Context Resolver. */
+  appliesTo?: PreferenceAppliesTo
+  /** Higher = kept first under the token budget. Default 50. */
+  priority?: number
 }
 
 export type UserModelValue = BehaviorPatternValue | PreferenceValue
