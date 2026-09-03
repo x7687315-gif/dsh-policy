@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "demo": "tsx examples/demo.ts",
+    "project": "tsx src/project/cli.ts",
     "build": "tsdown"
   },
   "devDependencies": {
